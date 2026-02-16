@@ -98,7 +98,7 @@ final class Product
         }
         if ($value > self::MAX_WEIGHT) {
             throw new DomainValidationException(
-                sprintf('Product field "%s" must be <= %.0f kg (got %.2f).', $field, self::MAX_WEIGHT, $value)
+                sprintf('Product field "%s" must be <= %.0f (got %.2f).', $field, self::MAX_WEIGHT, $value)
             );
         }
 
