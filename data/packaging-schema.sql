@@ -29,6 +29,13 @@ INSERT INTO packaging (id, width, height, length, max_weight) VALUES (2, 4.0, 4.
 INSERT INTO packaging (id, width, height, length, max_weight) VALUES (3, 2.0, 2.0, 10.0, 20);
 INSERT INTO packaging (id, width, height, length, max_weight) VALUES (4, 5.5, 6.0, 7.5, 30);
 INSERT INTO packaging (id, width, height, length, max_weight) VALUES (5, 9.0, 9.0, 9.0, 30);
+INSERT INTO packaging (id, width, height, length, max_weight) VALUES (6, 1.0, 1.0, 1.0, 5);
+INSERT INTO packaging (id, width, height, length, max_weight) VALUES (7, 2.0, 3.0, 4.0, 10);
+INSERT INTO packaging (id, width, height, length, max_weight) VALUES (8, 3.0, 5.0, 8.0, 15);
+INSERT INTO packaging (id, width, height, length, max_weight) VALUES (9, 6.0, 6.0, 12.0, 25);
+INSERT INTO packaging (id, width, height, length, max_weight) VALUES (10, 10.0, 12.0, 14.0, 40);
+INSERT INTO packaging (id, width, height, length, max_weight) VALUES (11, 12.5, 15.0, 18.0, 60);
+INSERT INTO packaging (id, width, height, length, max_weight) VALUES (12, 20.0, 20.0, 20.0, 80);
 COMMIT;
 
 CREATE DATABASE IF NOT EXISTS test_packing;
