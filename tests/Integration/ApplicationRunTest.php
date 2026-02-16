@@ -166,12 +166,12 @@ final class ApplicationRunTest extends TestCase
         $products = [new Product(1.0, 2.0, 3.0, 1.0)];
         $cache->storeSelectedBox($products, 1);
 
-        $hash = $this->entityManager->getConnection()->fetchOne('SELECT input_hash FROM packing_calculation_cache LIMIT 1');
+        $hash = $this->entityManager->getConnection()->fetchOne('SELECT id FROM packing_calculation_cache LIMIT 1');
         $this->assertIsString($hash);
 
         $expiredAt = (new DateTimeImmutable('-2 hours'))->format('Y-m-d H:i:s');
         $this->entityManager->getConnection()->executeStatement(
-            'UPDATE packing_calculation_cache SET updated_at = :expiredAt WHERE input_hash = :hash',
+            'UPDATE packing_calculation_cache SET updated_at = :expiredAt WHERE id = :hash',
             ['expiredAt' => $expiredAt, 'hash' => $hash]
         );
 
@@ -179,7 +179,7 @@ final class ApplicationRunTest extends TestCase
         $this->assertNull($selectedBoxId, 'Expired cache entry should be treated as miss.');
 
         $remainingRaw = $this->entityManager->getConnection()->fetchOne(
-            'SELECT COUNT(*) FROM packing_calculation_cache WHERE input_hash = :hash',
+            'SELECT COUNT(*) FROM packing_calculation_cache WHERE id = :hash',
             ['hash' => $hash]
         );
         if (!is_numeric($remainingRaw)) {
@@ -197,12 +197,12 @@ final class ApplicationRunTest extends TestCase
         $products = [new Product(1.5, 2.5, 3.5, 1.0)];
         $cache->storeSelectedBox($products, 2);
 
-        $hash = $this->entityManager->getConnection()->fetchOne('SELECT input_hash FROM packing_calculation_cache LIMIT 1');
+        $hash = $this->entityManager->getConnection()->fetchOne('SELECT id FROM packing_calculation_cache LIMIT 1');
         $this->assertIsString($hash);
 
         $expiredAt = (new DateTimeImmutable('-2 hours'))->format('Y-m-d H:i:s');
         $this->entityManager->getConnection()->executeStatement(
-            'UPDATE packing_calculation_cache SET updated_at = :expiredAt WHERE input_hash = :hash',
+            'UPDATE packing_calculation_cache SET updated_at = :expiredAt WHERE id = :hash',
             ['expiredAt' => $expiredAt, 'hash' => $hash]
         );
 
@@ -210,7 +210,7 @@ final class ApplicationRunTest extends TestCase
         $this->assertSame(2, $selectedBoxId);
 
         $remainingRaw = $this->entityManager->getConnection()->fetchOne(
-            'SELECT COUNT(*) FROM packing_calculation_cache WHERE input_hash = :hash',
+            'SELECT COUNT(*) FROM packing_calculation_cache WHERE id = :hash',
             ['hash' => $hash]
         );
         if (!is_numeric($remainingRaw)) {

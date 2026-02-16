@@ -10,33 +10,33 @@ use App\Packing\Domain\Model\Box;
 use App\Packing\Domain\Model\Product;
 
 use function count;
-
-use GuzzleHttp\ClientInterface;
-use GuzzleHttp\Exception\GuzzleException;
-
-use function in_array;
 use function is_array;
 use function is_string;
 use function json_decode;
+use function json_encode;
 
+use Psr\Http\Client\ClientExceptionInterface;
+use Psr\Http\Client\ClientInterface;
+use Psr\Http\Message\RequestFactoryInterface;
 use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\StreamFactoryInterface;
 use Psr\Log\LoggerInterface;
 
 use function sprintf;
 
 final class ThirdPartyPackabilityCheckerAdapter implements PackabilityCheckerPort
 {
-    private const int DEFAULT_TIMEOUT_SECONDS = 4;
     private const array RETRIABLE_STATUS_CODES = [408, 429, 503, 504]; // Timeout, RateLimit, ServiceUnavailable, GatewayTimeout
 
     public function __construct(
         private ClientInterface $httpClient,
+        private RequestFactoryInterface $requestFactory,
+        private StreamFactoryInterface $streamFactory,
         private LoggerInterface $logger,
         private string $apiUrl,
         private string $apiUsername,
         private string $apiKey,
         private PackingCachePort $cache,
-        private int $timeoutSeconds = self::DEFAULT_TIMEOUT_SECONDS,
     ) {
     }
 
@@ -120,20 +120,21 @@ final class ThirdPartyPackabilityCheckerAdapter implements PackabilityCheckerPor
         $this->logger->debug('[PackingAPI] Payload', ['payload' => $payload]);
 
         try {
-            $response = $this->httpClient->request('POST', $this->apiUrl, [
-                'headers' => [
-                    'Accept' => 'application/json',
-                    'Content-Type' => 'application/json',
-                ],
-                'json' => $payload,
-                'timeout' => $this->timeoutSeconds,
-                'http_errors' => false,
-            ]);
+            $body = json_encode($payload, JSON_THROW_ON_ERROR);
+            $request = $this->requestFactory->createRequest('POST', $this->apiUrl)
+                ->withHeader('Accept', 'application/json')
+                ->withHeader('Content-Type', 'application/json')
+                ->withBody($this->streamFactory->createStream($body));
+            $response = $this->httpClient->sendRequest($request);
             $this->logger->info('[PackingAPI] Response status', ['status' => $response->getStatusCode()]);
             $this->logger->debug('[PackingAPI] Response body', ['body' => (string) $response->getBody()]);
 
             return $response;
-        } catch (GuzzleException $exception) {
+        } catch (\JsonException $exception) {
+            $this->logger->error('[PackingAPI] Payload serialization failed', ['error' => $exception->getMessage()]);
+
+            throw new ThirdPartyPackingException('Third-party packing API payload serialization failed.', 0, $exception);
+        } catch (ClientExceptionInterface $exception) {
             $this->logger->error('[PackingAPI] Network failure', ['error' => $exception->getMessage()]);
 
             throw new ThirdPartyPackingException('Third-party packing API network failure.', 0, $exception);

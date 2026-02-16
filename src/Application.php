@@ -14,8 +14,8 @@ use App\Packing\Infrastructure\Persistence\DoctrinePackingCacheAdapter;
 use App\Packing\Interface\Http\InputValidationException;
 use App\Packing\Interface\Http\ProductRequestMapper;
 use App\Shared\Env;
+use App\Shared\HttpClientFactory;
 use Doctrine\ORM\EntityManager;
-use GuzzleHttp\Client;
 
 use function is_array;
 use function is_string;
@@ -24,8 +24,11 @@ use function json_encode;
 
 use OpenApi\Attributes as OA;
 use OpenApi\Generator;
+use Psr\Http\Client\ClientInterface;
+use Psr\Http\Message\RequestFactoryInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Message\StreamFactoryInterface;
 use Psr\Log\LoggerInterface;
 use Slim\Factory\AppFactory;
 use Slim\Psr7\Factory\ResponseFactory;
@@ -39,15 +42,26 @@ class Application
 {
     private EntityManager $entityManager;
     private LoggerInterface $logger;
+    private ClientInterface|null $httpClient;
+    private RequestFactoryInterface|null $requestFactory;
+    private StreamFactoryInterface|null $streamFactory;
     /**
      * @var \Slim\App<\Psr\Container\ContainerInterface|null>
      */
     private \Slim\App $app;
 
-    public function __construct(EntityManager $entityManager, LoggerInterface $logger)
-    {
+    public function __construct(
+        EntityManager $entityManager,
+        LoggerInterface $logger,
+        ClientInterface|null $httpClient = null,
+        RequestFactoryInterface|null $requestFactory = null,
+        StreamFactoryInterface|null $streamFactory = null
+    ) {
         $this->entityManager = $entityManager;
         $this->logger = $logger;
+        $this->httpClient = $httpClient;
+        $this->requestFactory = $requestFactory;
+        $this->streamFactory = $streamFactory;
         $this->app = AppFactory::create(new ResponseFactory(), null);
 
         $this->app->get('/openapi.json', function (ServerRequestInterface $request, ResponseInterface $response): ResponseInterface {
@@ -233,14 +247,18 @@ class Application
             Env::getInt('PACKING_CACHE_TTL_SECONDS', 0),
         );
 
+        $httpClient = $this->buildHttpClient();
+        $requestFactory = $this->buildRequestFactory();
+        $streamFactory = $this->buildStreamFactory();
         $thirdPartyChecker = new ThirdPartyPackabilityCheckerAdapter(
-            new Client(),
+            $httpClient,
+            $requestFactory,
+            $streamFactory,
             $this->logger,
             Env::getString('PACKING_API_URL'),
             Env::getString('PACKING_API_USERNAME'),
             Env::getString('PACKING_API_KEY'),
             $cache,
-            Env::getInt('PACKING_API_TIMEOUT_SECONDS', 4),
         );
 
         if (Env::getInt('PACKING_FORCE_FALLBACK', 0) === 1) {
@@ -258,6 +276,41 @@ class Application
             $checker,
             $cache,
             $this->logger
+        );
+    }
+
+    private function buildHttpClient(): ClientInterface
+    {
+        if ($this->httpClient !== null) {
+            return $this->httpClient;
+        }
+
+        return $this->buildHttpClientFactory()->createClient();
+    }
+
+    private function buildRequestFactory(): RequestFactoryInterface
+    {
+        if ($this->requestFactory !== null) {
+            return $this->requestFactory;
+        }
+
+        return $this->buildHttpClientFactory()->createRequestFactory();
+    }
+
+    private function buildStreamFactory(): StreamFactoryInterface
+    {
+        if ($this->streamFactory !== null) {
+            return $this->streamFactory;
+        }
+
+        return $this->buildHttpClientFactory()->createStreamFactory();
+    }
+
+    private function buildHttpClientFactory(): HttpClientFactory
+    {
+        return new HttpClientFactory(
+            Env::getInt('PACKING_API_TIMEOUT_SECONDS', 4),
+            false
         );
     }
 

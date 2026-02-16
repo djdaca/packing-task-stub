@@ -15,12 +15,11 @@ CREATE TABLE IF NOT EXISTS packaging (
 );
 
 CREATE TABLE IF NOT EXISTS packing_calculation_cache (
-	id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-	input_hash VARCHAR(64) NOT NULL,
+	id VARCHAR(64) NOT NULL,
 	selected_box_id INT UNSIGNED NOT NULL,
 	created_at DATETIME NOT NULL,
 	updated_at DATETIME NOT NULL,
-	UNIQUE KEY uniq_input_hash (input_hash),
+	PRIMARY KEY (id),
 	FOREIGN KEY (selected_box_id) REFERENCES packaging(id)
 );
 

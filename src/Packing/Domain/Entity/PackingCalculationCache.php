@@ -10,16 +10,11 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'packing_calculation_cache')]
-#[ORM\UniqueConstraint(name: 'uniq_input_hash', columns: ['input_hash'])]
 class PackingCalculationCache
 {
     #[ORM\Id]
-    #[ORM\Column(type: Types::INTEGER)]
-    #[ORM\GeneratedValue]
-    private int|null $id = null;
-
-    #[ORM\Column(type: Types::STRING, length: 64, name: 'input_hash')]
-    private string $inputHash;
+    #[ORM\Column(type: Types::STRING, length: 64)]
+    private string $id;
 
     #[ORM\Column(type: Types::INTEGER, name: 'selected_box_id', nullable: true)]
     private int|null $selectedBoxId = null;
@@ -30,18 +25,13 @@ class PackingCalculationCache
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE, name: 'updated_at')]
     private DateTimeImmutable $updatedAt;
 
-    public function __construct(string $inputHash, int|null $selectedBoxId = null)
+    public function __construct(string $hash, int|null $selectedBoxId = null)
     {
         $now = new DateTimeImmutable();
-        $this->inputHash = $inputHash;
+        $this->id = $hash;
         $this->selectedBoxId = $selectedBoxId;
         $this->createdAt = $now;
         $this->updatedAt = $now;
-    }
-
-    public function getInputHash(): string
-    {
-        return $this->inputHash;
     }
 
     public function getSelectedBoxId(): int|null
@@ -55,7 +45,7 @@ class PackingCalculationCache
         $this->updatedAt = new DateTimeImmutable();
     }
 
-    public function getId(): int|null
+    public function getId(): string
     {
         return $this->id;
     }

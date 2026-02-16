@@ -131,7 +131,7 @@ make test-coverage                  # With coverage report
 
 ```sql
 Table: packing_calculation_cache
-├─ input_hash: SHA256 of normalized products
+├─ id: SHA256 of normalized products (PRIMARY KEY)
 ├─ selected_box_id: ID of selected box (NOT NULL)
 ├─ created_at: First cache entry timestamp
 └─ updated_at: Last access timestamp

@@ -47,7 +47,7 @@ final class DoctrinePackingCacheAdapter implements PackingCachePort
         /** @var PackingCalculationCache|null $cached */
         $cached = $this->entityManager
             ->getRepository(PackingCalculationCache::class)
-            ->findOneBy(['inputHash' => $hash]);
+            ->find($hash);
 
         if ($cached !== null) {
             if ($this->isExpired($cached)) {
@@ -92,7 +92,7 @@ final class DoctrinePackingCacheAdapter implements PackingCachePort
             $repository = $this->entityManager->getRepository(PackingCalculationCache::class);
 
             /** @var PackingCalculationCache|null $cached */
-            $cached = $repository->findOneBy(['inputHash' => $hash]);
+            $cached = $repository->find($hash);
 
             if ($cached !== null) {
                 $this->entityManager->lock($cached, LockMode::PESSIMISTIC_WRITE);
@@ -116,7 +116,7 @@ final class DoctrinePackingCacheAdapter implements PackingCachePort
                 $this->entityManager->clear();
                 $repository = $this->entityManager->getRepository(PackingCalculationCache::class);
                 /** @var PackingCalculationCache|null $existing */
-                $existing = $repository->findOneBy(['inputHash' => $hash]);
+                $existing = $repository->find($hash);
                 if ($existing !== null) {
                     $this->entityManager->lock($existing, LockMode::PESSIMISTIC_WRITE);
                     $existing->setSelectedBoxId($selectedBoxId);
