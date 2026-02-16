@@ -15,17 +15,40 @@ Microservice for calculating the most suitable box for packing products based on
 
 ## Quick Start
 
-### Setup
+### Prerequisites
+
+- Docker and Docker Compose
+- Make
+- Git
+
+### Installation
+
+1. **Clone and setup environment:**
 ```bash
-# Create .env file with your UID/GID
-printf "UID=$(id -u)\nGID=$(id -g)" > .env
+git clone <repository>
+cd packing-task-stub
 
-# Start services
-make up
+# Copy env template and set your UID/GID (for Docker volumes)
+cp .env.example .env
+printf "UID=$(id -u)\nGID=$(id -g)" >> .env
 
-# Run application
-make bash
+# Configure credentials in .env:
+# - PACKING_API_USERNAME (3dbinpacking.com account email)
+# - PACKING_API_KEY (3dbinpacking.com API key)
+# - Other settings as needed
+nano .env  # or your preferred editor
 ```
+
+2. **Start services and Install dependencies:**
+```bash
+make start       # Start and install Docker containers
+```
+
+3. **Access the application:**
+
+- **API**: `http://localhost:8080/pack`
+- **API Documentation** (Swagger UI): `http://localhost:8080/docs`
+- **OpenAPI Spec** (JSON): `http://localhost:8080/openapi.json`
 
 ### Makefile Commands
 ```bash
@@ -42,12 +65,6 @@ make cs              # Run PHP-CS-Fixer (dry-run)
 make cs-fix          # Run PHP-CS-Fixer (apply fixes)
 make ci              # Run all checks (tests, stan, php-cs-fixer)
 ```
-
-### Application
-
-- **URL**: `http://localhost:8080`
-- **Documentation**: `http://localhost:8080/docs`
-- **OpenAPI**: `GET /openapi.json`
 
 ### API Endpoint
 
