@@ -163,13 +163,11 @@ Table: packing_calculation_cache
 
 ### Third-party Packing API
 
-**Configuration** (in `.env`):
-```env
-PACKING_API_USERNAME=your_3dbinpacking_username_email
-PACKING_API_KEY=your_3dbinpacking_api_key
-PACKING_API_URL=https://eu.api.3dbinpacking.com/packer/findBinSize
-PACKING_API_TIMEOUT_SECONDS=4
-```
+**Configuration** (see `.env.example`):
+- `PACKING_API_USERNAME` - 3dbinpacking.com account email
+- `PACKING_API_KEY` - 3dbinpacking.com API key
+- `PACKING_API_URL` - API endpoint
+- `PACKING_API_TIMEOUT_SECONDS` - Request timeout (default: 4 seconds)
 
 **Resilience:**
 - Primary: 3dbinpacking.com API
@@ -207,22 +205,8 @@ testing: test_packing
 
 ### Environment Variables
 
-```bash
-# Database configuration
-DB_HOST=mysql               # Docker service name
-DB_USER=packing             # User with select/insert/update/delete
-DB_PASSWORD=packing         # Password
-DB_NAME=packing             # Production database
-DB_PORT=3306               # MariaDB port
-
-# Third-party API
-PACKING_API_USERNAME=...   # 3dbinpacking.com account email
-PACKING_API_KEY=...        # 3dbinpacking.com API key
-PACKING_API_URL=...        # API endpoint
-PACKING_API_TIMEOUT_SECONDS=4  # Request timeout
-
-# Cache
-
-# Logging
-APP_DEBUG=0                # Change to 1 for DEBUG level logs
-```
+See `.env.example` for all available configuration options:
+- Database connection (host, user, password, database, port)
+- Third-party API credentials and endpoint
+- Request timeout settings
+- Logging level (`APP_DEBUG`)
