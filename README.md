@@ -142,7 +142,6 @@ Table: packing_calculation_cache
 - One row per unique set of products (efficient)
 - Hash includes products only (not boxes)
 - Cache entries are written **only for successful Third-party API checks**
-- Optional TTL expiration for cache entries (disabled when set to 0)
 - Type: `INT UNSIGNED` with Foreign Key to `packaging(id)`
 
 ### Tests Database
@@ -223,7 +222,6 @@ PACKING_API_URL=...        # API endpoint
 PACKING_API_TIMEOUT_SECONDS=4  # Request timeout
 
 # Cache
-PACKING_CACHE_TTL_SECONDS=0     # 0 disables TTL, otherwise cache expires after N seconds
 
 # Logging
 APP_DEBUG=0                # Change to 1 for DEBUG level logs

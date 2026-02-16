@@ -244,7 +244,6 @@ class Application
         $cache = new DoctrinePackingCacheAdapter(
             $this->entityManager,
             $this->logger,
-            Env::getInt('PACKING_CACHE_TTL_SECONDS', 0),
         );
 
         $httpClient = $this->buildHttpClient();

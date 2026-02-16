@@ -17,7 +17,6 @@ use App\Packing\Infrastructure\Persistence\DoctrineBoxCatalogAdapter;
 use App\Packing\Infrastructure\Persistence\DoctrinePackingCacheAdapter;
 use App\Packing\Interface\Http\ProductRequestMapper;
 use App\Shared\Env;
-use DateTimeImmutable;
 use Doctrine\ORM\EntityManager;
 
 use function file_get_contents;
@@ -157,65 +156,5 @@ final class ApplicationRunTest extends TestCase
         $this->assertNull($cached, 'Cache should NOT be stored when no box found (selected_box_id NOT NULL)');
     }
 
-    public function testCacheEntryExpiresWhenTtlElapsed(): void
-    {
-        $logger = new Logger('packing-cache');
-        $logger->pushHandler(new StreamHandler('php://temp', Logger::DEBUG));
-        $cache = new DoctrinePackingCacheAdapter($this->entityManager, $logger, 1);
-
-        $products = [new Product(1.0, 2.0, 3.0, 1.0)];
-        $cache->storeSelectedBox($products, 1);
-
-        $hash = $this->entityManager->getConnection()->fetchOne('SELECT id FROM packing_calculation_cache LIMIT 1');
-        $this->assertIsString($hash);
-
-        $expiredAt = (new DateTimeImmutable('-2 hours'))->format('Y-m-d H:i:s');
-        $this->entityManager->getConnection()->executeStatement(
-            'UPDATE packing_calculation_cache SET updated_at = :expiredAt WHERE id = :hash',
-            ['expiredAt' => $expiredAt, 'hash' => $hash]
-        );
-
-        $selectedBoxId = $cache->getSelectedBox($products);
-        $this->assertNull($selectedBoxId, 'Expired cache entry should be treated as miss.');
-
-        $remainingRaw = $this->entityManager->getConnection()->fetchOne(
-            'SELECT COUNT(*) FROM packing_calculation_cache WHERE id = :hash',
-            ['hash' => $hash]
-        );
-        if (!is_numeric($remainingRaw)) {
-            $this->fail('Expected numeric COUNT(*) result.');
-        }
-        $this->assertSame(0, (int) $remainingRaw);
-    }
-
-    public function testCacheDoesNotExpireWhenTtlDisabled(): void
-    {
-        $logger = new Logger('packing-cache');
-        $logger->pushHandler(new StreamHandler('php://temp', Logger::DEBUG));
-        $cache = new DoctrinePackingCacheAdapter($this->entityManager, $logger, 0);
-
-        $products = [new Product(1.5, 2.5, 3.5, 1.0)];
-        $cache->storeSelectedBox($products, 2);
-
-        $hash = $this->entityManager->getConnection()->fetchOne('SELECT id FROM packing_calculation_cache LIMIT 1');
-        $this->assertIsString($hash);
-
-        $expiredAt = (new DateTimeImmutable('-2 hours'))->format('Y-m-d H:i:s');
-        $this->entityManager->getConnection()->executeStatement(
-            'UPDATE packing_calculation_cache SET updated_at = :expiredAt WHERE id = :hash',
-            ['expiredAt' => $expiredAt, 'hash' => $hash]
-        );
-
-        $selectedBoxId = $cache->getSelectedBox($products);
-        $this->assertSame(2, $selectedBoxId);
-
-        $remainingRaw = $this->entityManager->getConnection()->fetchOne(
-            'SELECT COUNT(*) FROM packing_calculation_cache WHERE id = :hash',
-            ['hash' => $hash]
-        );
-        if (!is_numeric($remainingRaw)) {
-            $this->fail('Expected numeric COUNT(*) result.');
-        }
-        $this->assertSame(1, (int) $remainingRaw);
-    }
+    // TTL-based cache expiration tests removed; cache does not expire automatically.
 }
