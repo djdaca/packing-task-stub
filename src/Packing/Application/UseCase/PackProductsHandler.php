@@ -27,7 +27,7 @@ final class PackProductsHandler
     /**
      * @param list<Product> $products
      */
-    public function handle(array $products): ?Box
+    public function handle(array $products): Box|null
     {
         $this->logger->info('[PackProductsHandler] Starting box selection', [
             'productCount' => count($products),

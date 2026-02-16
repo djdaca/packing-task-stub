@@ -11,10 +11,10 @@ interface PackingCachePort
     /**
      * @param list<Product> $products
      */
-    public function getSelectedBox(array $products): ?int;
+    public function getSelectedBox(array $products): int|null;
 
     /**
      * @param list<Product> $products
      */
-    public function storeSelectedBox(array $products, ?int $selectedBoxId): void;
+    public function storeSelectedBox(array $products, int $selectedBoxId): void;
 }

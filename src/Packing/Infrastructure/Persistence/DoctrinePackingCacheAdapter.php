@@ -36,7 +36,7 @@ final class DoctrinePackingCacheAdapter implements PackingCachePort
     /**
      * @param list<Product> $products
      */
-    public function getSelectedBox(array $products): ?int
+    public function getSelectedBox(array $products): int|null
     {
         $hash = $this->buildHash($products);
         $this->logger->debug('[PackingCache] Checking for cached result', ['hash' => $hash]);
@@ -75,7 +75,7 @@ final class DoctrinePackingCacheAdapter implements PackingCachePort
     /**
      * @param list<Product> $products
      */
-    public function storeSelectedBox(array $products, ?int $selectedBoxId): void
+    public function storeSelectedBox(array $products, int $selectedBoxId): void
     {
         $hash = $this->buildHash($products);
         $this->logger->debug('[PackingCache] Storing cache result', [

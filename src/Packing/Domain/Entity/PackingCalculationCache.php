@@ -16,8 +16,8 @@ class PackingCalculationCache
     #[ORM\Column(type: Types::STRING, length: 64)]
     private string $id;
 
-    #[ORM\Column(type: Types::INTEGER, name: 'selected_box_id', nullable: true)]
-    private int|null $selectedBoxId = null;
+    #[ORM\Column(type: Types::INTEGER, name: 'selected_box_id')]
+    private int $selectedBoxId;
 
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE, name: 'created_at')]
     private DateTimeImmutable $createdAt;
@@ -25,7 +25,7 @@ class PackingCalculationCache
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE, name: 'updated_at')]
     private DateTimeImmutable $updatedAt;
 
-    public function __construct(string $hash, int|null $selectedBoxId = null)
+    public function __construct(string $hash, int $selectedBoxId)
     {
         $now = new DateTimeImmutable();
         $this->id = $hash;
@@ -34,12 +34,12 @@ class PackingCalculationCache
         $this->updatedAt = $now;
     }
 
-    public function getSelectedBoxId(): int|null
+    public function getSelectedBoxId(): int
     {
         return $this->selectedBoxId;
     }
 
-    public function setSelectedBoxId(int|null $selectedBoxId): void
+    public function setSelectedBoxId(int $selectedBoxId): void
     {
         $this->selectedBoxId = $selectedBoxId;
         $this->updatedAt = new DateTimeImmutable();

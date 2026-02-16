@@ -99,14 +99,14 @@ final class InMemoryCache implements PackingCachePort
     /** @var array<string, int|null> */
     public array $storage = [];
 
-    public function getSelectedBox(array $products): ?int
+    public function getSelectedBox(array $products): int|null
     {
         $key = $this->buildKey($products);
 
         return $this->storage[$key] ?? null;
     }
 
-    public function storeSelectedBox(array $products, ?int $selectedBoxId): void
+    public function storeSelectedBox(array $products, int|null $selectedBoxId): void
     {
         $this->storage[$this->buildKey($products)] = $selectedBoxId;
     }

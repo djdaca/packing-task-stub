@@ -57,7 +57,14 @@ final class ThirdPartyPackabilityCheckerAdapter implements PackabilityCheckerPor
 
         // Cache only successful API responses (not fallback results)
         if ($canPack) {
-            $this->cache->storeSelectedBox($products, $box->getId());
+            $boxId = $box->getId();
+            if ($boxId === null) {
+                $this->logger->warning('[PackingAPI] Selected box has no ID; skipping cache write.');
+
+                return $canPack;
+            }
+
+            $this->cache->storeSelectedBox($products, $boxId);
         }
 
         return $canPack;

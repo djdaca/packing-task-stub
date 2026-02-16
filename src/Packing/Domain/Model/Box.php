@@ -12,7 +12,7 @@ use function sprintf;
 final class Box
 {
     public function __construct(
-        private ?int $id,
+        private int|null $id,
         private float $width,
         private float $height,
         private float $length,
@@ -24,7 +24,7 @@ final class Box
         $this->maxWeight = $this->assertPositive($this->maxWeight, 'maxWeight');
     }
 
-    public function getId(): ?int
+    public function getId(): int|null
     {
         return $this->id;
     }
