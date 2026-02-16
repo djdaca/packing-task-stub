@@ -1,0 +1,51 @@
+name: shipmonk-packing
+services:
+  mysql:
+    image: mariadb:10.10
+    ports:
+      - "3306:3306"
+    environment:
+      MARIADB_RANDOM_ROOT_PASSWORD: 'yes'
+      MARIADB_DATABASE: packing
+    hostname: mysql
+    volumes:
+      - ../data/packaging-schema.sql:/docker-entrypoint-initdb.d/packaging-schema.sql:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  app:
+    build: .
+    working_dir: /app
+    command: ["php", "-S", "0.0.0.0:8080", "-t", "public"]
+    user: ${UID:-1000}:${GID:-1000}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    env_file: ../.env
+    environment:
+      COMPOSER_CACHE_DIR: /tmp/composer-cache
+    ports:
+      - "8080:8080"
+    volumes:
+      - ../src:/app/src
+      - ../tests:/app/tests
+      - ../composer.json:/app/composer.json
+      - ../composer.lock:/app/composer.lock
+      - ../phpstan.neon:/app/phpstan.neon
+      - ../.php-cs-fixer.dist.php:/app/.php-cs-fixer.dist.php
+      - ../phpunit.xml:/app/phpunit.xml
+      - ../public:/app/public
+      - ../vendor:/app/vendor
+      - composer-cache:/tmp/composer-cache
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/docs/index.html"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  composer-cache:

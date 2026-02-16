@@ -1,12 +1,230 @@
-### init
-- `printf "UID=$(id -u)\nGID=$(id -g)" > .env`
-- `docker-compose up -d`
-- `docker-compose run shipmonk-packing-app bash`
-- `composer install && bin/doctrine orm:schema-tool:create && bin/doctrine dbal:run-sql "$(cat data/packaging-data.sql)"`
+# Packing API
 
-### run
-- `php run.php "$(cat sample.json)"`
+Microservice for calculating the most suitable box for packing products based on their dimensions (width, height, length, weight).
 
-### adminer
-- Open `http://localhost:8080/?server=mysql&username=root&db=packing`
-- Password: secret
+## Features
+
+✅ **Third-party API Integration** - Uses 3dbinpacking.com API for packing calculations  
+✅ **Resilient Fallback** - Local fallback algorithm when third-party API fails  
+✅ **Result Caching** - Efficient database cache storing only final selected box (not per-box data)  
+✅ **Comprehensive Logging** - Detailed logs for debugging and monitoring  
+✅ **Full Test Coverage** - 61 tests covering all critical components (unit + integration)  
+✅ **DDD Architecture** - Clean separation with Ports & Adapters pattern  
+✅ **Test Isolation** - Separate `test_packing` database for clean test environment  
+✅ **Docker Ready** - Full Docker Compose setup with MariaDB and PHP  
+
+## Quick Start
+
+### Setup
+```bash
+# Create .env file with your UID/GID
+printf "UID=$(id -u)\nGID=$(id -g)" > .env
+
+# Start services
+make up
+
+# Run application
+make bash
+```
+
+### Makefile Commands
+```bash
+make up              # Start Docker services (containers + build)
+make down            # Stop and remove containers
+make down-v          # Stop and remove containers + volumes
+make restart         # Restart services (down && up)
+make bash            # Open shell in app container
+make install         # Install composer dependencies
+make test            # Run unit tests
+make test-coverage   # Run tests with coverage report
+make stan            # Run PHPStan static analysis
+make cs              # Run PHP-CS-Fixer (dry-run)
+make cs-fix          # Run PHP-CS-Fixer (apply fixes)
+make ci              # Run all checks (tests, stan, php-cs-fixer)
+```
+
+### Application
+
+- **URL**: `http://localhost:8080`
+- **Documentation**: `http://localhost:8080/docs`
+- **OpenAPI**: `GET /openapi.json`
+
+### API Endpoint
+
+```
+POST /pack
+Content-Type: application/json
+
+Request:
+{"products":[{"width":3,"height":3,"length":3,"weight":1}]}
+
+Response (200):
+{"box":{"id":2,"width":4,"height":4,"length":4,"maxWeight":20}}
+
+Response (422 - no suitable box):
+{"error":"No single usable box found for the provided products."}
+
+Response (400 - validation error):
+{"error":"Field \"products\" is required and must be an array."}
+```
+
+## How It Works
+
+1. **Validation** - ProductRequestMapper validates input
+2. **Cache Check** - Checks if result already cached for these products
+3. **Box Selection**:
+   - Gets all boxes sorted by volume (smallest first)
+   - Filters by min dimensions and max weight
+   - Calls packability checker for remaining candidates
+4. **Caching** - Stores selected box ID in cache (only when a box is found by Third-party API)
+5. **Response** - Returns selected box or 422 error
+
+### ports and adapters
+DDD + ports-and-adapters architecture in `src/Packing`:
+
+- **Domain** - Core entities and invariants
+  - `Box`, `Product` - value objects with validation
+  - `DomainValidationException` - domain rule violations
+
+- **Application** - Use-cases and ports (interfaces)
+  - `PackProductsHandler` - main use-case with cache integration
+  - `BoxCatalogPort` - box repository interface
+  - `PackabilityCheckerPort` - packing validation interface
+  - `PackingCachePort` - cache interface
+
+- **Infrastructure** - Adapters (implementations)
+  - `DoctrineBoxCatalogAdapter` - box catalog from database
+  - `DoctrinePackingCacheAdapter` - caching with database
+  - `ThirdPartyPackabilityCheckerAdapter` - 3dbinpacking.com API integration
+  - `FallbackPackabilityCheckerAdapter` - local volume-based algorithm
+  - `ResilientPackabilityChecker` - resilience wrapper (primary + fallback)
+
+- **Interface** - HTTP layer
+  - `ProductRequestMapper` - input validation and mapping
+  - `InputValidationException` - HTTP validation errors
+
+### Tests
+
+**61 tests** covering all critical components:
+
+- **Unit Tests** (`tests/Unit`):
+  - `PackProductsHandler` - Main use-case logic with cache integration
+  - `FallbackPackabilityCheckerAdapter` - Local packing algorithm (8 tests)
+  - `ResilientPackabilityChecker` - Resilience/fallback mechanism (3 tests)
+  - `ProductRequestMapper` - Input validation (14 tests)
+  - `Box` and `Product` models - Domain logic (22 tests)
+
+- **Integration Tests** (`tests/Integration`):
+  - Full application flow with real database
+  - Cache behavior (cache hits, misses)
+  - No-box-found scenario
+
+**Run tests:**
+```bash
+make test                           # All tests
+make test-coverage                  # With coverage report
+./vendor/bin/phpunit --testsuite Unit       # Unit only
+./vendor/bin/phpunit tests/Integration/     # Integration only
+```
+
+### Caching
+
+```sql
+Table: packing_calculation_cache
+├─ input_hash: SHA256 of normalized products
+├─ selected_box_id: ID of selected box (NOT NULL)
+├─ created_at: First cache entry timestamp
+└─ updated_at: Last access timestamp
+```
+
+**Key Points:**
+- Cache stores **only the final selected box ID** (not per-box data)
+- One row per unique set of products (efficient)
+- Hash includes products only (not boxes)
+- Cache entries are written **only for successful Third-party API checks**
+- Optional TTL expiration for cache entries (disabled when set to 0)
+- Type: `INT UNSIGNED` with Foreign Key to `packaging(id)`
+
+### Tests Database
+
+- **Separate database**: `test_packing` (isolated from production `packing`)
+- **Auto-created**: Schema cloned from `packing` DB on startup
+- **Clean state**: `DELETE FROM packing_calculation_cache` in `tearDown()`
+- **Purpose**: Prevent test data pollution during test runs
+- **Initialization**: `packaging-schema.sql` creates both databases + seeds data
+
+### Logging
+
+- All logs output to `stdout` (visible in Docker Desktop)
+- Log levels:
+  - `INFO` - Important events (box selection, cache hits)
+  - `DEBUG` - Detailed information (payloads, cache operations)
+  - `WARNING` - Failures and fallback usage
+  - `ERROR` - Critical errors (API failures, validation)
+
+### Third-party Packing API
+
+**Configuration** (in `.env`):
+```env
+PACKING_API_USERNAME=your_3dbinpacking_username_email
+PACKING_API_KEY=your_3dbinpacking_api_key
+PACKING_API_URL=https://eu.api.3dbinpacking.com/packer/findBinSize
+PACKING_API_TIMEOUT_SECONDS=4
+```
+
+**Resilience:**
+- Primary: 3dbinpacking.com API
+- Fallback: Local volume-based algorithm (when API fails or times out)
+- Fallback uses dimension and weight validation
+
+### Database
+
+**Structure:**
+```
+production: packing
+├─ packaging (5 boxes)
+└─ packing_calculation_cache (cached results)
+
+testing: test_packing
+├─ packaging (5 boxes, cloned from packing)
+└─ packing_calculation_cache (empty, test-isolated)
+```
+
+**Boxes (Seed Data):**
+| ID | Width | Height | Length | Max Weight |
+|----|-------|--------|--------|-----------|
+| 1  | 2.5   | 3.0    | 1.0    | 20kg      |
+| 2  | 4.0   | 4.0    | 4.0    | 20kg      |
+| 3  | 2.0   | 2.0    | 10.0   | 20kg      |
+| 4  | 5.5   | 6.0    | 7.5    | 30kg      |
+| 5  | 9.0   | 9.0    | 9.0    | 30kg      |
+
+**Initialization:**
+- Single source: `data/packaging-schema.sql`
+- Creates both `packing` and `test_packing` databases
+- Defines schema with UNSIGNED types and Foreign Keys
+- Clones structure from `packing` → `test_packing` using `LIKE`
+- Clones seed data using `INSERT ... SELECT`
+
+### Environment Variables
+
+```bash
+# Database configuration
+DB_HOST=mysql               # Docker service name
+DB_USER=packing             # User with select/insert/update/delete
+DB_PASSWORD=packing         # Password
+DB_NAME=packing             # Production database
+DB_PORT=3306               # MariaDB port
+
+# Third-party API
+PACKING_API_USERNAME=...   # 3dbinpacking.com account email
+PACKING_API_KEY=...        # 3dbinpacking.com API key
+PACKING_API_URL=...        # API endpoint
+PACKING_API_TIMEOUT_SECONDS=4  # Request timeout
+
+# Cache
+PACKING_CACHE_TTL_SECONDS=0     # 0 disables TTL, otherwise cache expires after N seconds
+
+# Logging
+APP_DEBUG=0                # Change to 1 for DEBUG level logs
+```

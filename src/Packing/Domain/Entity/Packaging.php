@@ -1,6 +1,8 @@
 <?php
 
-namespace App\Entity;
+declare(strict_types=1);
+
+namespace App\Packing\Domain\Entity;
 
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
@@ -13,11 +15,10 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Entity]
 class Packaging
 {
-
     #[ORM\Id]
     #[ORM\Column(type: Types::INTEGER)]
     #[ORM\GeneratedValue]
-    private ?int $id = null;
+    private int|null $id = null;
 
     #[ORM\Column(type: Types::FLOAT)]
     private float $width;
@@ -39,4 +40,28 @@ class Packaging
         $this->maxWeight = $maxWeight;
     }
 
+    public function getId(): int|null
+    {
+        return $this->id;
+    }
+
+    public function getWidth(): float
+    {
+        return $this->width;
+    }
+
+    public function getHeight(): float
+    {
+        return $this->height;
+    }
+
+    public function getLength(): float
+    {
+        return $this->length;
+    }
+
+    public function getMaxWeight(): float
+    {
+        return $this->maxWeight;
+    }
 }
