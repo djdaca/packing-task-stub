@@ -1,6 +1,7 @@
 /.env
 /.idea
 /vendor
-SOLUTION_DEFENSE.md
 /.phpunit.cache
+SOLUTION_DEFENSE.md
 SUMMARY.md
+log.txt

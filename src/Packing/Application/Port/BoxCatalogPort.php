@@ -9,8 +9,19 @@ use App\Packing\Domain\Model\Box;
 interface BoxCatalogPort
 {
     /**
-     * Returns all available boxes sorted by volume (smallest first), then by max weight.
+     * Returns a specific box by ID, or null if not found.
+     */
+    public function findBox(int $id): Box|null;
+
+    /**
+     * Returns boxes suitable for given dimensions, sorted by volume (smallest first).
+     * Filters by minimum dimensions and maximum weight capability.
      * @return list<Box>
      */
-    public function getAllBoxes(): array;
+    public function getBoxesSuitableForDimensions(
+        float $width,
+        float $height,
+        float $length,
+        int $totalWeight
+    ): array;
 }

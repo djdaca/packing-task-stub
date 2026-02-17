@@ -1,4 +1,4 @@
-.PHONY: up down down-v install start bash test test-coverage ci restart
+.PHONY: up down down-v install start bash test test-coverage ci cs cs-fix restart
 
 APP := app
 DC := docker-compose -f docker/docker-compose.yml

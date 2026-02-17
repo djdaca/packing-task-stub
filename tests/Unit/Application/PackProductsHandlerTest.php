@@ -11,7 +11,9 @@ use App\Packing\Application\UseCase\PackProductsHandler;
 use App\Packing\Domain\Model\Box;
 use App\Packing\Domain\Model\Product;
 
+use function array_filter;
 use function array_map;
+use function array_values;
 use function hash;
 use function json_encode;
 
@@ -86,11 +88,35 @@ final class InMemoryBoxCatalog implements BoxCatalogPort
     }
 
     /**
+     * Returns a specific box by ID, or null if not found.
+     */
+    public function findBox(int $id): Box|null
+    {
+        foreach ($this->boxes as $box) {
+            if ($box->getId() === $id) {
+                return $box;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * @return list<Box>
      */
-    public function getAllBoxes(): array
-    {
-        return $this->boxes;
+    public function getBoxesSuitableForDimensions(
+        float $width,
+        float $height,
+        float $length,
+        int $totalWeight
+    ): array {
+        return array_values(array_filter(
+            $this->boxes,
+            static fn (Box $box): bool => $box->getWidth() >= $width
+                && $box->getHeight() >= $height
+                && $box->getLength() >= $length
+                && $box->getMaxWeight() >= $totalWeight,
+        ));
     }
 }
 

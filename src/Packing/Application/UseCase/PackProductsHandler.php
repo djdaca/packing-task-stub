@@ -33,21 +33,7 @@ final class PackProductsHandler
             'productCount' => count($products),
         ]);
 
-        $boxes = $this->boxCatalog->getAllBoxes();
-        $this->logger->debug('[PackProductsHandler] Available boxes', ['count' => count($boxes)]);
-
-        // Check cache first
-        $cachedBoxId = $this->cache->getSelectedBox($products);
-        if ($cachedBoxId !== null) {
-            foreach ($boxes as $box) {
-                if ($box->getId() === $cachedBoxId) {
-                    $this->logger->info('[PackProductsHandler] Box selected from cache', ['boxId' => $box->getId()]);
-
-                    return $box;
-                }
-            }
-        }
-
+        // Calculate product requirements
         $maxWidth = 0.0;
         $maxHeight = 0.0;
         $maxLength = 0.0;
@@ -66,20 +52,22 @@ final class PackProductsHandler
             'totalWeight' => $totalWeight,
         ]);
 
-        foreach ($boxes as $box) {
-            if (
-                $box->getWidth() < $maxWidth
-                || $box->getHeight() < $maxHeight
-                || $box->getLength() < $maxLength
-                || $box->getMaxWeight() < $totalWeight
-            ) {
-                $this->logger->debug('[PackProductsHandler] Box skipped - dimensions/weight too small', [
-                    'boxId' => $box->getId(),
-                ]);
+        // Check cache first
+        $cachedBoxId = $this->cache->getSelectedBox($products);
+        if ($cachedBoxId !== null) {
+            $cachedBox = $this->boxCatalog->findBox($cachedBoxId);
+            if ($cachedBox !== null) {
+                $this->logger->info('[PackProductsHandler] Box selected from cache', ['boxId' => $cachedBox->getId()]);
 
-                continue;
+                return $cachedBox;
             }
+        }
 
+        // Get suitable boxes filtered by dimensions/weight
+        $boxes = $this->boxCatalog->getBoxesSuitableForDimensions($maxWidth, $maxHeight, $maxLength, (int) $totalWeight);
+        $this->logger->debug('[PackProductsHandler] Suitable boxes', ['count' => count($boxes)]);
+
+        foreach ($boxes as $box) {
             $this->logger->debug('[PackProductsHandler] Checking packability', ['boxId' => $box->getId()]);
             $canPack = $this->packabilityChecker->canPackIntoBox($products, $box);
             $this->logger->debug('[PackProductsHandler] Packability check result', [

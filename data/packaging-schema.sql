@@ -1,4 +1,3 @@
--- Vytvoření uživatele 'packing' s omezenými právy
 CREATE USER IF NOT EXISTS 'packing'@'%' IDENTIFIED BY 'packing';
 GRANT SELECT, INSERT, UPDATE, DELETE ON packing.* TO 'packing'@'%';
 GRANT SELECT, INSERT, UPDATE, DELETE ON test_packing.* TO 'packing'@'%';
@@ -39,10 +38,8 @@ COMMIT;
 
 CREATE DATABASE IF NOT EXISTS test_packing;
 
--- Klonování tabulek (struktura)
 CREATE TABLE test_packing.packaging LIKE packing.packaging;
 CREATE TABLE test_packing.packing_calculation_cache LIKE packing.packing_calculation_cache;
 
--- Klonování dat
 INSERT INTO test_packing.packaging SELECT * FROM packing.packaging;
 INSERT INTO test_packing.packing_calculation_cache SELECT * FROM packing.packing_calculation_cache;

@@ -10,7 +10,9 @@ use App\Packing\Domain\Model\Box;
 
 use function array_map;
 
+use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\EntityManager;
+use Doctrine\ORM\Query\Parameter;
 
 final class DoctrineBoxCatalogAdapter implements BoxCatalogPort
 {
@@ -19,18 +21,53 @@ final class DoctrineBoxCatalogAdapter implements BoxCatalogPort
     }
 
     /**
+     * Returns a specific box by ID, or null if not found.
+     */
+    public function findBox(int $id): Box|null
+    {
+        $packaging = $this->entityManager->find(Packaging::class, $id);
+        if ($packaging === null) {
+            return null;
+        }
+
+        return new Box(
+            $packaging->getId(),
+            $packaging->getWidth(),
+            $packaging->getHeight(),
+            $packaging->getLength(),
+            $packaging->getMaxWeight(),
+        );
+    }
+
+    /**
      * @return list<Box>
      */
-    public function getAllBoxes(): array
-    {
-        $qb = $this->entityManager->createQueryBuilder();
-        $qb->select('p')
-            ->from(Packaging::class, 'p')
-            ->orderBy('p.width * p.height * p.length', 'ASC')
-            ->addOrderBy('p.maxWeight', 'ASC');
-
+    public function getBoxesSuitableForDimensions(
+        float $width,
+        float $height,
+        float $length,
+        int $totalWeight
+    ): array {
         /** @var list<Packaging> $packagings */
-        $packagings = $qb->getQuery()->getResult();
+        $packagings = $this->entityManager->createQueryBuilder()
+            ->select('p')
+            ->from(Packaging::class, 'p')
+            ->where(implode(' AND ', [
+                'p.width >= :width',
+                'p.height >= :height',
+                'p.length >= :length',
+                'p.maxWeight >= :totalWeight',
+            ]))
+            ->setParameters(new ArrayCollection([
+                new Parameter('width', $width),
+                new Parameter('height', $height),
+                new Parameter('length', $length),
+                new Parameter('totalWeight', $totalWeight),
+            ]))
+            ->orderBy('p.width * p.height * p.length', 'ASC')
+            ->addOrderBy('p.maxWeight', 'ASC')
+            ->getQuery()
+            ->getResult();
 
         return array_map(
             static fn (Packaging $packaging): Box => new Box(
@@ -38,9 +75,9 @@ final class DoctrineBoxCatalogAdapter implements BoxCatalogPort
                 $packaging->getWidth(),
                 $packaging->getHeight(),
                 $packaging->getLength(),
-                $packaging->getMaxWeight()
+                $packaging->getMaxWeight(),
             ),
-            $packagings
+            $packagings,
         );
     }
 }
