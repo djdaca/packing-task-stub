@@ -32,12 +32,29 @@ class Packaging
     #[ORM\Column(type: Types::FLOAT)]
     private float $maxWeight;
 
+    #[ORM\Column(type: Types::FLOAT)]
+    private float $dimMin;
+
+    #[ORM\Column(type: Types::FLOAT)]
+    private float $dimMid;
+
+    #[ORM\Column(type: Types::FLOAT)]
+    private float $dimMax;
+
     public function __construct(float $width, float $height, float $length, float $maxWeight)
     {
         $this->width = $width;
         $this->height = $height;
         $this->length = $length;
         $this->maxWeight = $maxWeight;
+
+        $minDim = min($width, $height, $length);
+        $maxDim = max($width, $height, $length);
+        $midDim = $width + $height + $length - $minDim - $maxDim;
+
+        $this->dimMin = $minDim;
+        $this->dimMid = $midDim;
+        $this->dimMax = $maxDim;
     }
 
     public function getId(): int|null
@@ -63,5 +80,20 @@ class Packaging
     public function getMaxWeight(): float
     {
         return $this->maxWeight;
+    }
+
+    public function getDimMin(): float
+    {
+        return $this->dimMin;
+    }
+
+    public function getDimMid(): float
+    {
+        return $this->dimMid;
+    }
+
+    public function getDimMax(): float
+    {
+        return $this->dimMax;
     }
 }

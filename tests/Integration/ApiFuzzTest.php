@@ -15,13 +15,13 @@ use function json_encode;
 
 use Monolog\Handler\StreamHandler;
 use Monolog\Logger;
-use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Slim\Psr7\Factory\ServerRequestFactory;
 use Slim\Psr7\Stream;
 
-#[CoversClass(Application::class)]
+#[CoversNothing]
 final class ApiFuzzTest extends TestCase
 {
     private Application $application;
@@ -70,6 +70,24 @@ final class ApiFuzzTest extends TestCase
         $jsonRaw = (string) $response->getBody();
         $decoded = json_decode($jsonRaw, true);
         $this->assertIsArray($decoded, 'Response JSON must be an object.');
+    }
+
+    public function testPackEndpointFindsBoxWhenRotationIsRequired(): void
+    {
+        $request = $this->createJsonRequest([
+            'products' => [
+                ['id' => 1, 'width' => 3.4, 'height' => 2.2, 'length' => 3.0, 'weight' => 4.0],
+                ['id' => 2, 'width' => 4.9, 'height' => 1.0, 'length' => 2.4, 'weight' => 9.9],
+            ],
+        ]);
+
+        $response = $this->application->run($request);
+
+        $this->assertSame(200, $response->getStatusCode());
+
+        $decoded = json_decode((string) $response->getBody(), true);
+        $this->assertIsArray($decoded);
+        $this->assertArrayHasKey('box', $decoded);
     }
 
     /**

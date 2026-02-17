@@ -42,20 +42,21 @@ final class DoctrineBoxCatalogAdapter implements BoxCatalogPort
         float $length,
         float $totalWeight
     ): array {
+        // Input dimensions are already sorted (smallest to largest)
         /** @var list<Packaging> $packagings */
         $packagings = $this->entityManager->createQueryBuilder()
             ->select('p')
             ->from(Packaging::class, 'p')
             ->where(implode(' AND ', [
-                'p.width >= :width',
-                'p.height >= :height',
-                'p.length >= :length',
+                'p.dimMin >= :dim1',
+                'p.dimMid >= :dim2',
+                'p.dimMax >= :dim3',
                 'p.maxWeight >= :totalWeight',
             ]))
             ->setParameters(new ArrayCollection([
-                new Parameter('width', $width),
-                new Parameter('height', $height),
-                new Parameter('length', $length),
+                new Parameter('dim1', $width),
+                new Parameter('dim2', $height),
+                new Parameter('dim3', $length),
                 new Parameter('totalWeight', $totalWeight),
             ]))
             ->orderBy('p.width * p.height * p.length', 'ASC')

@@ -89,22 +89,21 @@ final class PackProductsHandler
      */
     private function calculateProductRequirements(array $products): array
     {
-        $maxWidth = 0.0;
-        $maxHeight = 0.0;
-        $maxLength = 0.0;
+        $maxSortedDims = [0.0, 0.0, 0.0];
         $totalWeight = 0.0;
 
         foreach ($products as $product) {
-            $maxWidth = max($maxWidth, $product->getWidth());
-            $maxHeight = max($maxHeight, $product->getHeight());
-            $maxLength = max($maxLength, $product->getLength());
+            $sortedDims = $product->sortedDimensions();
+            $maxSortedDims[0] = max($maxSortedDims[0], $sortedDims[0]);
+            $maxSortedDims[1] = max($maxSortedDims[1], $sortedDims[1]);
+            $maxSortedDims[2] = max($maxSortedDims[2], $sortedDims[2]);
             $totalWeight += $product->getWeight();
         }
 
         return [
-            'maxWidth' => $maxWidth,
-            'maxHeight' => $maxHeight,
-            'maxLength' => $maxLength,
+            'maxWidth' => $maxSortedDims[0],
+            'maxHeight' => $maxSortedDims[1],
+            'maxLength' => $maxSortedDims[2],
             'totalWeight' => $totalWeight,
         ];
     }
