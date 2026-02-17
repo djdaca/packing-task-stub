@@ -22,6 +22,6 @@ interface BoxCatalogPort
         float $width,
         float $height,
         float $length,
-        int $totalWeight
+        float $totalWeight
     ): array;
 }

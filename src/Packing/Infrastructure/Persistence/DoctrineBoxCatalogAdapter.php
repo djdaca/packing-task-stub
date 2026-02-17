@@ -46,7 +46,7 @@ final class DoctrineBoxCatalogAdapter implements BoxCatalogPort
         float $width,
         float $height,
         float $length,
-        int $totalWeight
+        float $totalWeight
     ): array {
         /** @var list<Packaging> $packagings */
         $packagings = $this->entityManager->createQueryBuilder()

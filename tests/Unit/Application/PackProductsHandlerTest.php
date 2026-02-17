@@ -108,7 +108,7 @@ final class InMemoryBoxCatalog implements BoxCatalogPort
         float $width,
         float $height,
         float $length,
-        int $totalWeight
+        float $totalWeight
     ): array {
         return array_values(array_filter(
             $this->boxes,

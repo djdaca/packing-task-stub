@@ -64,7 +64,7 @@ final class PackProductsHandler
         }
 
         // Get suitable boxes filtered by dimensions/weight
-        $boxes = $this->boxCatalog->getBoxesSuitableForDimensions($maxWidth, $maxHeight, $maxLength, (int) $totalWeight);
+        $boxes = $this->boxCatalog->getBoxesSuitableForDimensions($maxWidth, $maxHeight, $maxLength, $totalWeight);
         $this->logger->debug('[PackProductsHandler] Suitable boxes', ['count' => count($boxes)]);
 
         foreach ($boxes as $box) {
