@@ -9,9 +9,11 @@ use App\Packing\Application\Port\PackingCachePort;
 use App\Packing\Domain\Model\Box;
 use App\Packing\Domain\Model\Product;
 
+use function array_unique;
 use function count;
 use function in_array;
 use function is_array;
+use function is_string;
 use function json_decode;
 use function json_encode;
 
@@ -110,7 +112,7 @@ final class ThirdPartyPackabilityCheckerAdapter implements PackabilityCheckerPor
             'items' => $items,
             'params' => [
                 'optimization_mode' => 'bins_number',
-                'item_distribution' => true,
+                'item_distribution' => false,
             ],
         ];
     }
@@ -196,7 +198,6 @@ final class ThirdPartyPackabilityCheckerAdapter implements PackabilityCheckerPor
      */
     private function extractPackable(array $payload, int $requestedItemCount): bool
     {
-        // API response structure: { "response": { "bins_packed": [ { "items": [...] } ] } }
         $responseNode = $payload['response'] ?? null;
         if (!is_array($responseNode)) {
             $this->logger->error('[PackingAPI] Response does not contain "response" node.');
@@ -207,6 +208,37 @@ final class ThirdPartyPackabilityCheckerAdapter implements PackabilityCheckerPor
         $binsPacked = $responseNode['bins_packed'] ?? null;
         if (!is_array($binsPacked) || !isset($binsPacked[0])) {
             $this->logger->error('[PackingAPI] Response does not contain "bins_packed" array.');
+
+            return false;
+        }
+
+        $binsPackedCount = count($binsPacked);
+        if ($binsPackedCount !== 1) {
+            $this->logger->debug('[PackingAPI] Items were distributed to multiple bins.', [
+                'binsPackedCount' => $binsPackedCount,
+            ]);
+
+            return false;
+        }
+
+        $notPackedItems = $responseNode['not_packed_items'] ?? null;
+        if (!is_array($notPackedItems)) {
+            $this->logger->error('[PackingAPI] Response does not contain "not_packed_items" array.');
+
+            return false;
+        }
+
+        if (count($notPackedItems) > 0) {
+            $this->logger->debug('[PackingAPI] Response contains not packed items.', [
+                'notPackedCount' => count($notPackedItems),
+            ]);
+
+            return false;
+        }
+
+        $status = $responseNode['status'] ?? null;
+        if ($status !== 1) {
+            $this->logger->warning('[PackingAPI] Response status indicates failure.', ['status' => $status]);
 
             return false;
         }
@@ -225,8 +257,25 @@ final class ThirdPartyPackabilityCheckerAdapter implements PackabilityCheckerPor
             return false;
         }
 
-        // Check if all requested items were packed
-        $packedCount = count($items);
+        $packedItemIds = [];
+        foreach ($items as $item) {
+            if (!is_array($item)) {
+                $this->logger->error('[PackingAPI] Packed item entry is not an array.');
+
+                return false;
+            }
+
+            $itemId = $item['id'] ?? null;
+            if (!is_string($itemId) || $itemId === '') {
+                $this->logger->error('[PackingAPI] Packed item is missing a valid "id".');
+
+                return false;
+            }
+
+            $packedItemIds[] = $itemId;
+        }
+
+        $packedCount = count(array_unique($packedItemIds));
         $canPack = $packedCount === $requestedItemCount;
 
         $this->logger->debug('[PackingAPI] Packability result', [
