@@ -22,27 +22,16 @@ class PackingCalculationCache
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE, name: 'created_at')]
     private DateTimeImmutable $createdAt;
 
-    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, name: 'updated_at')]
-    private DateTimeImmutable $updatedAt;
-
     public function __construct(string $hash, int $selectedBoxId)
     {
-        $now = new DateTimeImmutable();
         $this->id = $hash;
         $this->selectedBoxId = $selectedBoxId;
-        $this->createdAt = $now;
-        $this->updatedAt = $now;
+        $this->createdAt = new DateTimeImmutable();
     }
 
     public function getSelectedBoxId(): int
     {
         return $this->selectedBoxId;
-    }
-
-    public function setSelectedBoxId(int $selectedBoxId): void
-    {
-        $this->selectedBoxId = $selectedBoxId;
-        $this->updatedAt = new DateTimeImmutable();
     }
 
     public function getId(): string
@@ -53,10 +42,5 @@ class PackingCalculationCache
     public function getCreatedAt(): DateTimeImmutable
     {
         return $this->createdAt;
-    }
-
-    public function getUpdatedAt(): DateTimeImmutable
-    {
-        return $this->updatedAt;
     }
 }

@@ -10,8 +10,8 @@ use App\Packing\Domain\Model\Box;
 use App\Packing\Domain\Model\Product;
 
 use function count;
+use function in_array;
 use function is_array;
-use function is_string;
 use function json_decode;
 use function json_encode;
 
@@ -109,9 +109,6 @@ final class ThirdPartyPackabilityCheckerAdapter implements PackabilityCheckerPor
             ]],
             'items' => $items,
             'params' => [
-                'item_coordinates' => true,
-                'images_sbs' => false,
-                'images_separated' => false,
                 'optimization_mode' => 'bins_number',
                 'item_distribution' => true,
             ],
@@ -156,25 +153,21 @@ final class ThirdPartyPackabilityCheckerAdapter implements PackabilityCheckerPor
 
         $statusCode = $response->getStatusCode();
         $isRetriable = in_array($statusCode, self::RETRIABLE_STATUS_CODES, true);
+
         $logMessage = sprintf(
-            '[PackingAPI] API returned status %d (%s)%s',
+            '[PackingAPI] API returned status %d (%s) - Will use fallback',
             $statusCode,
             $this->getHttpStatusName($statusCode),
-            $isRetriable ? ' - Will use fallback' : ''
         );
 
         if ($isRetriable) {
             $this->logger->warning($logMessage);
-
-            throw new ThirdPartyPackingException(
-                sprintf('Third-party API unavailable (status %d). Falling back to local calculation.', $statusCode)
-            );
+        } else {
+            $this->logger->error($logMessage);
         }
 
-        $this->logger->error($logMessage);
-
         throw new ThirdPartyPackingException(
-            sprintf('Third-party packing API error: status %d.', $statusCode)
+            sprintf('Third-party API error (status %d). Falling back to local calculation.', $statusCode)
         );
     }
 
@@ -203,37 +196,46 @@ final class ThirdPartyPackabilityCheckerAdapter implements PackabilityCheckerPor
      */
     private function extractPackable(array $payload, int $requestedItemCount): bool
     {
-        if (isset($payload['unfitted_items']) && is_array($payload['unfitted_items'])) {
-            return $payload['unfitted_items'] === [];
-        }
-
+        // API response structure: { "response": { "bins_packed": [ { "items": [...] } ] } }
         $responseNode = $payload['response'] ?? null;
-        if (is_array($responseNode)) {
-            $responseUnfittedItems = $responseNode['unfitted_items'] ?? null;
-            if (is_array($responseUnfittedItems)) {
-                return $responseUnfittedItems === [];
-            }
+        if (!is_array($responseNode)) {
+            $this->logger->error('[PackingAPI] Response does not contain "response" node.');
+
+            return false;
         }
 
-        $rootBinsPacked = $payload['bins_packed'] ?? null;
-        if (is_array($rootBinsPacked) && isset($rootBinsPacked[0]) && is_array($rootBinsPacked[0])) {
-            $rootPackedItems = $rootBinsPacked[0]['items'] ?? null;
-            if (is_array($rootPackedItems)) {
-                return count($rootPackedItems) === $requestedItemCount;
-            }
+        $binsPacked = $responseNode['bins_packed'] ?? null;
+        if (!is_array($binsPacked) || !isset($binsPacked[0])) {
+            $this->logger->error('[PackingAPI] Response does not contain "bins_packed" array.');
+
+            return false;
         }
 
-        if (is_array($responseNode)) {
-            $responseBinsPacked = $responseNode['bins_packed'] ?? null;
-            if (is_array($responseBinsPacked) && isset($responseBinsPacked[0]) && is_array($responseBinsPacked[0])) {
-                $responsePackedItems = $responseBinsPacked[0]['items'] ?? null;
-                if (is_array($responsePackedItems)) {
-                    return count($responsePackedItems) === $requestedItemCount;
-                }
-            }
+        $firstBin = $binsPacked[0];
+        if (!is_array($firstBin)) {
+            $this->logger->error('[PackingAPI] First bin is not an array.');
+
+            return false;
         }
 
-        throw new ThirdPartyPackingException('Third-party packing API response did not contain packability info.');
+        $items = $firstBin['items'] ?? null;
+        if (!is_array($items)) {
+            $this->logger->error('[PackingAPI] Bin does not contain "items" array.');
+
+            return false;
+        }
+
+        // Check if all requested items were packed
+        $packedCount = count($items);
+        $canPack = $packedCount === $requestedItemCount;
+
+        $this->logger->debug('[PackingAPI] Packability result', [
+            'requestedItemCount' => $requestedItemCount,
+            'packedCount' => $packedCount,
+            'canPack' => $canPack,
+        ]);
+
+        return $canPack;
     }
 
     private function getHttpStatusName(int $statusCode): string
@@ -259,12 +261,6 @@ final class ThirdPartyPackabilityCheckerAdapter implements PackabilityCheckerPor
     {
         if (!is_array($payload)) {
             throw new ThirdPartyPackingException('Third-party packing API returned invalid payload shape.');
-        }
-
-        foreach ($payload as $key => $_) {
-            if (!is_string($key)) {
-                throw new ThirdPartyPackingException('Third-party packing API returned invalid payload shape.');
-            }
         }
 
         /** @var array<string, mixed> $payload */

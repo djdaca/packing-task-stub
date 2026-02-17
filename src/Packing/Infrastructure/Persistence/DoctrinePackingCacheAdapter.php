@@ -11,7 +11,6 @@ use App\Packing\Domain\Model\Product;
 use function array_map;
 
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
-use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManager;
 
 use function hash;
@@ -68,56 +67,21 @@ final class DoctrinePackingCacheAdapter implements PackingCachePort
             'selectedBoxId' => $selectedBoxId,
         ]);
 
-        $connection = $this->entityManager->getConnection();
-        $connection->beginTransaction();
+        // Check if already cached before attempting insert
+        $this->entityManager->clear();
+        $cached = $this->findCacheEntry($hash);
+        if ($cached !== null) {
+            $this->logger->debug('[PackingCache] Cache entry already exists; skipping');
 
-        try {
-            // Ensure we see the latest state inside the transaction
-            $this->entityManager->clear();
-
-            $cached = $this->findCacheEntry($hash);
-
-            if ($cached !== null) {
-                $this->updateCacheEntry($cached, $selectedBoxId, 'Updated existing cache entry');
-                $connection->commit();
-
-                return;
-            }
-
-            try {
-                $this->createCacheEntry($hash, $selectedBoxId);
-                $connection->commit();
-            } catch (UniqueConstraintViolationException) {
-                // Another request inserted the same hash in parallel
-                $this->entityManager->clear();
-                $existing = $this->findCacheEntry($hash);
-                if ($existing !== null) {
-                    $this->updateCacheEntry($existing, $selectedBoxId, 'Race detected, updated existing cache entry', [
-                        'hash' => $hash,
-                    ]);
-                }
-                $connection->commit();
-            }
-        } catch (\Throwable $exception) {
-            $connection->rollBack();
-
-            throw $exception;
+            return;
         }
-    }
 
-    /**
-     * @param array<string, mixed> $context
-     */
-    private function updateCacheEntry(
-        PackingCalculationCache $cached,
-        int $selectedBoxId,
-        string $message,
-        array $context = []
-    ): void {
-        $this->entityManager->lock($cached, LockMode::PESSIMISTIC_WRITE);
-        $cached->setSelectedBoxId($selectedBoxId);
-        $this->entityManager->flush();
-        $this->logger->info('[PackingCache] ' . $message, $context);
+        // Attempt insert; ignore if race condition occurs
+        try {
+            $this->createCacheEntry($hash, $selectedBoxId);
+        } catch (UniqueConstraintViolationException) {
+            $this->logger->debug('[PackingCache] Race condition detected; another request cached same hash');
+        }
     }
 
     private function createCacheEntry(string $hash, int $selectedBoxId): void
@@ -144,8 +108,8 @@ final class DoctrinePackingCacheAdapter implements PackingCachePort
             $dims = $product->sortedDimensions();
 
             return [
-                'dims' => array_map(static fn (float $value): string => number_format($value, 6, '.', ''), $dims),
-                'weight' => number_format($product->getWeight(), 6, '.', ''),
+                'dims' => array_map(static fn (float $value): string => number_format($value, 2, '.', ''), $dims),
+                'weight' => number_format($product->getWeight(), 2, '.', ''),
             ];
         }, $products);
 

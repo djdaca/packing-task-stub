@@ -33,10 +33,12 @@ final class PackProductsHandler
             'productCount' => count($products),
         ]);
 
+        $boxes = $this->boxCatalog->getAllBoxes();
+        $this->logger->debug('[PackProductsHandler] Available boxes', ['count' => count($boxes)]);
+
         // Check cache first
         $cachedBoxId = $this->cache->getSelectedBox($products);
         if ($cachedBoxId !== null) {
-            $boxes = $this->boxCatalog->getAllBoxes();
             foreach ($boxes as $box) {
                 if ($box->getId() === $cachedBoxId) {
                     $this->logger->info('[PackProductsHandler] Box selected from cache', ['boxId' => $box->getId()]);
@@ -63,9 +65,6 @@ final class PackProductsHandler
             'maxLength' => $maxLength,
             'totalWeight' => $totalWeight,
         ]);
-
-        $boxes = $this->boxCatalog->getAllBoxes();
-        $this->logger->debug('[PackProductsHandler] Available boxes', ['count' => count($boxes)]);
 
         foreach ($boxes as $box) {
             if (

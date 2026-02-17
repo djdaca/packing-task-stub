@@ -18,7 +18,6 @@ CREATE TABLE IF NOT EXISTS packing_calculation_cache (
 	id VARCHAR(64) NOT NULL,
 	selected_box_id INT UNSIGNED NOT NULL,
 	created_at DATETIME NOT NULL,
-	updated_at DATETIME NOT NULL,
 	PRIMARY KEY (id),
 	FOREIGN KEY (selected_box_id) REFERENCES packaging(id)
 );
