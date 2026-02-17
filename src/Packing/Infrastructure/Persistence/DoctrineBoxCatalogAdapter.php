@@ -36,15 +36,17 @@ final class DoctrineBoxCatalogAdapter implements BoxCatalogPort
     /**
      * @return list<Box>
      */
-    public function getBoxesSuitableForDimensions(
+    public function getBoxesSuitableForDimensionsBatch(
         float $width,
         float $height,
         float $length,
-        float $totalWeight
+        float $totalWeight,
+        int $limit,
+        float|null $lastVolume = null,
+        int|null $lastId = null,
     ): array {
         // Input dimensions are already sorted (smallest to largest)
-        /** @var list<Packaging> $packagings */
-        $packagings = $this->entityManager->createQueryBuilder()
+        $queryBuilder = $this->entityManager->createQueryBuilder()
             ->select('p')
             ->from(Packaging::class, 'p')
             ->where(implode(' AND ', [
@@ -59,8 +61,19 @@ final class DoctrineBoxCatalogAdapter implements BoxCatalogPort
                 new Parameter('dim3', $length),
                 new Parameter('totalWeight', $totalWeight),
             ]))
-            ->orderBy('p.width * p.height * p.length', 'ASC')
-            ->addOrderBy('p.maxWeight', 'ASC')
+            ->orderBy('p.volume', 'ASC')
+            ->addOrderBy('p.id', 'ASC')
+            ->setMaxResults($limit);
+
+        if ($lastVolume !== null && $lastId !== null) {
+            $queryBuilder
+                ->andWhere('(p.volume > :lastVolume OR (p.volume = :lastVolume AND p.id > :lastId))')
+                ->setParameter('lastVolume', $lastVolume)
+                ->setParameter('lastId', $lastId);
+        }
+
+        /** @var list<Packaging> $packagings */
+        $packagings = $queryBuilder
             ->getQuery()
             ->getResult();
 

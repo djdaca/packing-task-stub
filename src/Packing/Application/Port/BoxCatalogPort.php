@@ -8,20 +8,26 @@ use App\Packing\Domain\Model\Box;
 
 interface BoxCatalogPort
 {
+    public const int DEFAULT_BATCH_SIZE = 100;
+
     /**
      * Returns a specific box by ID, or null if not found.
      */
     public function findBox(int $id): Box|null;
 
     /**
-     * Returns boxes suitable for given dimensions, sorted by volume (smallest first).
-     * Filters by minimum dimensions and maximum weight capability.
+     * Returns one page of suitable boxes sorted by volume (smallest first), then ID.
+     * Input dimensions must be sorted ascending.
+     *
      * @return list<Box>
      */
-    public function getBoxesSuitableForDimensions(
+    public function getBoxesSuitableForDimensionsBatch(
         float $width,
         float $height,
         float $length,
-        float $totalWeight
+        float $totalWeight,
+        int $limit,
+        float|null $lastVolume = null,
+        int|null $lastId = null,
     ): array;
 }

@@ -13,6 +13,7 @@ use App\Packing\Domain\Model\Product;
 
 use function array_filter;
 use function array_map;
+use function array_slice;
 use function array_values;
 use function hash;
 use function json_encode;
@@ -104,19 +105,34 @@ final class InMemoryBoxCatalog implements BoxCatalogPort
     /**
      * @return list<Box>
      */
-    public function getBoxesSuitableForDimensions(
+    public function getBoxesSuitableForDimensionsBatch(
         float $width,
         float $height,
         float $length,
-        float $totalWeight
+        float $totalWeight,
+        int $limit,
+        float|null $lastVolume = null,
+        int|null $lastId = null,
     ): array {
-        return array_values(array_filter(
+        $boxes = array_values(array_filter(
             $this->boxes,
             static fn (Box $box): bool => $box->getWidth() >= $width
                 && $box->getHeight() >= $height
                 && $box->getLength() >= $length
                 && $box->getMaxWeight() >= $totalWeight,
         ));
+
+        usort($boxes, static fn (Box $left, Box $right): int => ($left->volume() <=> $right->volume()) ?: (($left->getId() ?? 0) <=> ($right->getId() ?? 0)));
+
+        if ($lastVolume !== null && $lastId !== null) {
+            $boxes = array_values(array_filter(
+                $boxes,
+                static fn (Box $box): bool => $box->volume() > $lastVolume
+                    || ($box->volume() === $lastVolume && ($box->getId() ?? 0) > $lastId),
+            ));
+        }
+
+        return array_slice($boxes, 0, $limit);
     }
 }
 

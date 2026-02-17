@@ -55,26 +55,52 @@ final class PackProductsHandler
         }
 
         // Get suitable boxes filtered by dimensions/weight
-        $boxes = $this->boxCatalog->getBoxesSuitableForDimensions(
-            $requirements['maxWidth'],
-            $requirements['maxHeight'],
-            $requirements['maxLength'],
-            $requirements['totalWeight']
-        );
-        $this->logger->debug('[PackProductsHandler] Suitable boxes', ['count' => count($boxes)]);
+        $lastVolume = null;
+        $lastId = null;
+        $scannedCandidates = 0;
 
-        foreach ($boxes as $box) {
-            $this->logger->debug('[PackProductsHandler] Checking packability', ['boxId' => $box->getId()]);
-            $canPack = $this->packabilityChecker->canPackIntoBox($products, $box);
-            $this->logger->debug('[PackProductsHandler] Packability check result', [
-                'boxId' => $box->getId(),
-                'canPack' => $canPack,
-            ]);
+        while (true) {
+            $boxes = $this->boxCatalog->getBoxesSuitableForDimensionsBatch(
+                $requirements['maxWidth'],
+                $requirements['maxHeight'],
+                $requirements['maxLength'],
+                $requirements['totalWeight'],
+                BoxCatalogPort::DEFAULT_BATCH_SIZE,
+                $lastVolume,
+                $lastId,
+            );
 
-            if ($canPack) {
-                $this->logger->info('[PackProductsHandler] Box selected', ['boxId' => $box->getId()]);
+            if ($boxes === []) {
+                break;
+            }
 
-                return $box;
+            $this->logger->debug('[PackProductsHandler] Suitable boxes batch', ['count' => count($boxes)]);
+
+            foreach ($boxes as $box) {
+                $scannedCandidates++;
+                $this->logger->debug('[PackProductsHandler] Checking packability', ['boxId' => $box->getId()]);
+                $canPack = $this->packabilityChecker->canPackIntoBox($products, $box);
+                $this->logger->debug('[PackProductsHandler] Packability check result', [
+                    'boxId' => $box->getId(),
+                    'canPack' => $canPack,
+                ]);
+
+                if ($canPack) {
+                    $this->logger->info('[PackProductsHandler] Box selected', [
+                        'boxId' => $box->getId(),
+                        'scannedCandidates' => $scannedCandidates,
+                    ]);
+
+                    return $box;
+                }
+            }
+
+            $lastBox = $boxes[count($boxes) - 1];
+            $lastVolume = $lastBox->volume();
+            $lastId = $lastBox->getId();
+
+            if ($lastId === null) {
+                break;
             }
         }
 
