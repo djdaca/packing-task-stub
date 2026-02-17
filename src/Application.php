@@ -246,13 +246,10 @@ class Application
             $this->logger,
         );
 
-        $httpClient = $this->buildHttpClient();
-        $requestFactory = $this->buildRequestFactory();
-        $streamFactory = $this->buildStreamFactory();
         $thirdPartyChecker = new ThirdPartyPackabilityCheckerAdapter(
-            $httpClient,
-            $requestFactory,
-            $streamFactory,
+            $this->buildHttpClient(),
+            $this->buildRequestFactory(),
+            $this->buildStreamFactory(),
             $this->logger,
             Env::getString('PACKING_API_URL'),
             Env::getString('PACKING_API_USERNAME'),
