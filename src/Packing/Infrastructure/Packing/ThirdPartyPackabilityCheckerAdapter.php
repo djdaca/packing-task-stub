@@ -10,9 +10,11 @@ use App\Packing\Domain\Model\Box;
 use App\Packing\Domain\Model\Product;
 
 use function array_unique;
+use function array_values;
 use function count;
 use function in_array;
 use function is_array;
+use function is_int;
 use function is_string;
 use function json_decode;
 use function json_encode;
@@ -25,6 +27,7 @@ use Psr\Http\Message\StreamFactoryInterface;
 use Psr\Log\LoggerInterface;
 
 use function sprintf;
+use function strtolower;
 
 final class ThirdPartyPackabilityCheckerAdapter implements PackabilityCheckerPort
 {
@@ -198,20 +201,135 @@ final class ThirdPartyPackabilityCheckerAdapter implements PackabilityCheckerPor
      */
     private function extractPackable(array $payload, int $requestedItemCount): bool
     {
+        $responseNode = $this->extractResponseNode($payload);
+        if ($responseNode === null) {
+            return false;
+        }
+
+        $this->assertApiAccessAvailable($responseNode);
+
+        $status = $responseNode['status'] ?? null;
+        $binsPacked = $this->extractBinsPacked($responseNode);
+        if ($binsPacked === null) {
+            return false;
+        }
+
+        if (!$this->hasSinglePackedBin($binsPacked)) {
+            return false;
+        }
+
+        if (!$this->hasNoNotPackedItems($responseNode)) {
+            return false;
+        }
+
+        if ($status !== 1) {
+            $this->logger->warning('[PackingAPI] Response status indicates failure.', ['status' => $status]);
+
+            return false;
+        }
+
+        $items = $this->extractPackedItemsFromFirstBin($binsPacked);
+        if ($items === null) {
+            return false;
+        }
+
+        $packedCount = $this->countUniquePackedItemIds($items);
+        if ($packedCount === null) {
+            return false;
+        }
+
+        $canPack = $packedCount === $requestedItemCount;
+
+        $this->logger->debug('[PackingAPI] Packability result', [
+            'requestedItemCount' => $requestedItemCount,
+            'packedCount' => $packedCount,
+            'canPack' => $canPack,
+        ]);
+
+        return $canPack;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>|null
+     */
+    private function extractResponseNode(array $payload): array|null
+    {
         $responseNode = $payload['response'] ?? null;
         if (!is_array($responseNode)) {
             $this->logger->error('[PackingAPI] Response does not contain "response" node.');
 
-            return false;
+            return null;
         }
 
+        /** @var array<string, mixed> $responseNode */
+        return $responseNode;
+    }
+
+    /**
+     * @param array<string, mixed> $responseNode
+     */
+    private function assertApiAccessAvailable(array $responseNode): void
+    {
+        $status = $responseNode['status'] ?? null;
+        if (is_int($status) && $status < 0) {
+            $this->logger->error('[PackingAPI] API returned negative status, using fallback.', ['status' => $status]);
+
+            throw new ThirdPartyPackingException(
+                sprintf('Third-party API application error (status %d). Falling back to local calculation.', $status)
+            );
+        }
+
+        $errors = $responseNode['errors'] ?? null;
+        if (!is_array($errors)) {
+            return;
+        }
+
+        foreach ($errors as $error) {
+            if (!is_array($error)) {
+                continue;
+            }
+
+            $message = $error['message'] ?? null;
+            if (!is_string($message)) {
+                continue;
+            }
+
+            $normalizedMessage = strtolower($message);
+            if (
+                str_contains($normalizedMessage, 'locked out')
+                || str_contains($normalizedMessage, 'banned')
+            ) {
+                $this->logger->error('[PackingAPI] API access is blocked, using fallback.', [
+                    'message' => $message,
+                ]);
+
+                throw new ThirdPartyPackingException('Third-party API access blocked. Falling back to local calculation.');
+            }
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $responseNode
+     * @return list<mixed>|null
+     */
+    private function extractBinsPacked(array $responseNode): array|null
+    {
         $binsPacked = $responseNode['bins_packed'] ?? null;
         if (!is_array($binsPacked) || !isset($binsPacked[0])) {
             $this->logger->error('[PackingAPI] Response does not contain "bins_packed" array.');
 
-            return false;
+            return null;
         }
 
+        return array_values($binsPacked);
+    }
+
+    /**
+     * @param list<mixed> $binsPacked
+     */
+    private function hasSinglePackedBin(array $binsPacked): bool
+    {
         $binsPackedCount = count($binsPacked);
         if ($binsPackedCount !== 1) {
             $this->logger->debug('[PackingAPI] Items were distributed to multiple bins.', [
@@ -221,6 +339,14 @@ final class ThirdPartyPackabilityCheckerAdapter implements PackabilityCheckerPor
             return false;
         }
 
+        return true;
+    }
+
+    /**
+     * @param array<string, mixed> $responseNode
+     */
+    private function hasNoNotPackedItems(array $responseNode): bool
+    {
         $notPackedItems = $responseNode['not_packed_items'] ?? null;
         if (!is_array($notPackedItems)) {
             $this->logger->error('[PackingAPI] Response does not contain "not_packed_items" array.');
@@ -236,55 +362,56 @@ final class ThirdPartyPackabilityCheckerAdapter implements PackabilityCheckerPor
             return false;
         }
 
-        $status = $responseNode['status'] ?? null;
-        if ($status !== 1) {
-            $this->logger->warning('[PackingAPI] Response status indicates failure.', ['status' => $status]);
+        return true;
+    }
 
-            return false;
-        }
-
+    /**
+     * @param list<mixed> $binsPacked
+     * @return list<mixed>|null
+     */
+    private function extractPackedItemsFromFirstBin(array $binsPacked): array|null
+    {
         $firstBin = $binsPacked[0];
         if (!is_array($firstBin)) {
             $this->logger->error('[PackingAPI] First bin is not an array.');
 
-            return false;
+            return null;
         }
 
         $items = $firstBin['items'] ?? null;
         if (!is_array($items)) {
             $this->logger->error('[PackingAPI] Bin does not contain "items" array.');
 
-            return false;
+            return null;
         }
 
+        return array_values($items);
+    }
+
+    /**
+     * @param list<mixed> $items
+     */
+    private function countUniquePackedItemIds(array $items): int|null
+    {
         $packedItemIds = [];
         foreach ($items as $item) {
             if (!is_array($item)) {
                 $this->logger->error('[PackingAPI] Packed item entry is not an array.');
 
-                return false;
+                return null;
             }
 
             $itemId = $item['id'] ?? null;
             if (!is_string($itemId) || $itemId === '') {
                 $this->logger->error('[PackingAPI] Packed item is missing a valid "id".');
 
-                return false;
+                return null;
             }
 
             $packedItemIds[] = $itemId;
         }
 
-        $packedCount = count(array_unique($packedItemIds));
-        $canPack = $packedCount === $requestedItemCount;
-
-        $this->logger->debug('[PackingAPI] Packability result', [
-            'requestedItemCount' => $requestedItemCount,
-            'packedCount' => $packedCount,
-            'canPack' => $canPack,
-        ]);
-
-        return $canPack;
+        return count(array_unique($packedItemIds));
     }
 
     private function getHttpStatusName(int $statusCode): string
