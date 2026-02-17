@@ -28,11 +28,7 @@ final class FallbackPackabilityCheckerAdapter implements PackabilityCheckerPort
         foreach ($products as $product) {
             $productDims = $product->sortedDimensions();
 
-            if (
-                $productDims[0] > $boxDims[0]
-                || $productDims[1] > $boxDims[1]
-                || $productDims[2] > $boxDims[2]
-            ) {
+            if (!$this->dimensionsFit($productDims, $boxDims)) {
                 $this->logger->info('[PackingAPI][Fallback] Product does not fit in box.', [
                     'productDims' => $productDims,
                     'boxDims' => $boxDims,
@@ -65,5 +61,16 @@ final class FallbackPackabilityCheckerAdapter implements PackabilityCheckerPort
         ]);
 
         return $result;
+    }
+
+    /**
+     * @param array{0: float, 1: float, 2: float} $productDims
+     * @param array{0: float, 1: float, 2: float} $boxDims
+     */
+    private function dimensionsFit(array $productDims, array $boxDims): bool
+    {
+        return $productDims[0] <= $boxDims[0]
+            && $productDims[1] <= $boxDims[1]
+            && $productDims[2] <= $boxDims[2];
     }
 }

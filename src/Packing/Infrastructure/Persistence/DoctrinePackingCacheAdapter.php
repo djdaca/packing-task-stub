@@ -38,9 +38,6 @@ final class DoctrinePackingCacheAdapter implements PackingCachePort
         $hash = $this->buildHash($products);
         $this->logger->debug('[PackingCache] Checking for cached result', ['hash' => $hash]);
 
-        // Refresh entity manager to ensure fresh query from DB
-        $this->entityManager->clear();
-
         $cached = $this->findCacheEntry($hash);
 
         if ($cached !== null) {
@@ -68,7 +65,6 @@ final class DoctrinePackingCacheAdapter implements PackingCachePort
         ]);
 
         // Check if already cached before attempting insert
-        $this->entityManager->clear();
         $cached = $this->findCacheEntry($hash);
         if ($cached !== null) {
             $this->logger->debug('[PackingCache] Cache entry already exists; skipping');
@@ -94,6 +90,9 @@ final class DoctrinePackingCacheAdapter implements PackingCachePort
 
     private function findCacheEntry(string $hash): PackingCalculationCache|null
     {
+        // Refresh entity manager to ensure fresh query from DB
+        $this->entityManager->clear();
+
         return $this->entityManager
             ->getRepository(PackingCalculationCache::class)
             ->find($hash);

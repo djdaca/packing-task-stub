@@ -30,13 +30,7 @@ final class DoctrineBoxCatalogAdapter implements BoxCatalogPort
             return null;
         }
 
-        return new Box(
-            $packaging->getId(),
-            $packaging->getWidth(),
-            $packaging->getHeight(),
-            $packaging->getLength(),
-            $packaging->getMaxWeight(),
-        );
+        return $this->toBox($packaging);
     }
 
     /**
@@ -70,14 +64,22 @@ final class DoctrineBoxCatalogAdapter implements BoxCatalogPort
             ->getResult();
 
         return array_map(
-            static fn (Packaging $packaging): Box => new Box(
-                $packaging->getId(),
-                $packaging->getWidth(),
-                $packaging->getHeight(),
-                $packaging->getLength(),
-                $packaging->getMaxWeight(),
-            ),
+            $this->toBox(...),
             $packagings,
+        );
+    }
+
+    /**
+     * Converts a Packaging entity to a Box domain model.
+     */
+    private function toBox(Packaging $packaging): Box
+    {
+        return new Box(
+            $packaging->getId(),
+            $packaging->getWidth(),
+            $packaging->getHeight(),
+            $packaging->getLength(),
+            $packaging->getMaxWeight(),
         );
     }
 }

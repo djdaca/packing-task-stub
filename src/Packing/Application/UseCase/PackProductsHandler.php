@@ -34,22 +34,13 @@ final class PackProductsHandler
         ]);
 
         // Calculate product requirements
-        $maxWidth = 0.0;
-        $maxHeight = 0.0;
-        $maxLength = 0.0;
-        $totalWeight = 0.0;
-        foreach ($products as $product) {
-            $maxWidth = max($maxWidth, $product->getWidth());
-            $maxHeight = max($maxHeight, $product->getHeight());
-            $maxLength = max($maxLength, $product->getLength());
-            $totalWeight += $product->getWeight();
-        }
+        $requirements = $this->calculateProductRequirements($products);
 
         $this->logger->debug('[PackProductsHandler] Product requirements', [
-            'maxWidth' => $maxWidth,
-            'maxHeight' => $maxHeight,
-            'maxLength' => $maxLength,
-            'totalWeight' => $totalWeight,
+            'maxWidth' => $requirements['maxWidth'],
+            'maxHeight' => $requirements['maxHeight'],
+            'maxLength' => $requirements['maxLength'],
+            'totalWeight' => $requirements['totalWeight'],
         ]);
 
         // Check cache first
@@ -64,7 +55,12 @@ final class PackProductsHandler
         }
 
         // Get suitable boxes filtered by dimensions/weight
-        $boxes = $this->boxCatalog->getBoxesSuitableForDimensions($maxWidth, $maxHeight, $maxLength, $totalWeight);
+        $boxes = $this->boxCatalog->getBoxesSuitableForDimensions(
+            $requirements['maxWidth'],
+            $requirements['maxHeight'],
+            $requirements['maxLength'],
+            $requirements['totalWeight']
+        );
         $this->logger->debug('[PackProductsHandler] Suitable boxes', ['count' => count($boxes)]);
 
         foreach ($boxes as $box) {
@@ -85,5 +81,31 @@ final class PackProductsHandler
         $this->logger->warning('[PackProductsHandler] No suitable box found');
 
         return null;
+    }
+
+    /**
+     * @param list<Product> $products
+     * @return array{maxWidth: float, maxHeight: float, maxLength: float, totalWeight: float}
+     */
+    private function calculateProductRequirements(array $products): array
+    {
+        $maxWidth = 0.0;
+        $maxHeight = 0.0;
+        $maxLength = 0.0;
+        $totalWeight = 0.0;
+
+        foreach ($products as $product) {
+            $maxWidth = max($maxWidth, $product->getWidth());
+            $maxHeight = max($maxHeight, $product->getHeight());
+            $maxLength = max($maxLength, $product->getLength());
+            $totalWeight += $product->getWeight();
+        }
+
+        return [
+            'maxWidth' => $maxWidth,
+            'maxHeight' => $maxHeight,
+            'maxLength' => $maxLength,
+            'totalWeight' => $totalWeight,
+        ];
     }
 }
