@@ -23,9 +23,9 @@ final class FallbackPackabilityCheckerAdapterTest extends TestCase
         $products = [new Product(2.0, 2.0, 2.0, 5.0)];
         $box = new Box(1, 5.0, 5.0, 5.0, 10.0);
 
-        $result = $checker->canPackIntoBox($products, $box);
+        $result = $checker->findFirstPackableBox($products, [$box]);
 
-        self::assertTrue($result);
+        self::assertSame(1, $result?->getId());
     }
 
     public function testProductDoesNotFitByWidth(): void
@@ -34,9 +34,9 @@ final class FallbackPackabilityCheckerAdapterTest extends TestCase
         $products = [new Product(6.0, 2.0, 2.0, 5.0)];
         $box = new Box(1, 5.0, 5.0, 5.0, 10.0);
 
-        $result = $checker->canPackIntoBox($products, $box);
+        $result = $checker->findFirstPackableBox($products, [$box]);
 
-        self::assertFalse($result);
+        self::assertNull($result);
     }
 
     public function testProductDoesNotFitByHeight(): void
@@ -45,9 +45,9 @@ final class FallbackPackabilityCheckerAdapterTest extends TestCase
         $products = [new Product(2.0, 6.0, 2.0, 5.0)];
         $box = new Box(1, 5.0, 5.0, 5.0, 10.0);
 
-        $result = $checker->canPackIntoBox($products, $box);
+        $result = $checker->findFirstPackableBox($products, [$box]);
 
-        self::assertFalse($result);
+        self::assertNull($result);
     }
 
     public function testProductDoesNotFitByLength(): void
@@ -56,9 +56,9 @@ final class FallbackPackabilityCheckerAdapterTest extends TestCase
         $products = [new Product(2.0, 2.0, 6.0, 5.0)];
         $box = new Box(1, 5.0, 5.0, 5.0, 10.0);
 
-        $result = $checker->canPackIntoBox($products, $box);
+        $result = $checker->findFirstPackableBox($products, [$box]);
 
-        self::assertFalse($result);
+        self::assertNull($result);
     }
 
     public function testExceedsMaxWeight(): void
@@ -70,9 +70,9 @@ final class FallbackPackabilityCheckerAdapterTest extends TestCase
         ];
         $box = new Box(1, 5.0, 5.0, 5.0, 10.0);
 
-        $result = $checker->canPackIntoBox($products, $box);
+        $result = $checker->findFirstPackableBox($products, [$box]);
 
-        self::assertFalse($result);
+        self::assertNull($result);
     }
 
     public function testMultipleProductsFit(): void
@@ -84,9 +84,9 @@ final class FallbackPackabilityCheckerAdapterTest extends TestCase
         ];
         $box = new Box(1, 5.0, 5.0, 5.0, 10.0);
 
-        $result = $checker->canPackIntoBox($products, $box);
+        $result = $checker->findFirstPackableBox($products, [$box]);
 
-        self::assertTrue($result);
+        self::assertSame(1, $result?->getId());
     }
 
     public function testTotalVolumeExceedsBoxVolume(): void
@@ -100,9 +100,9 @@ final class FallbackPackabilityCheckerAdapterTest extends TestCase
         ];
         $box = new Box(1, 3.0, 3.0, 3.0, 10.0);
 
-        $result = $checker->canPackIntoBox($products, $box);
+        $result = $checker->findFirstPackableBox($products, [$box]);
 
-        self::assertFalse($result);
+        self::assertNull($result);
     }
 
     public function testProductCanBeRotated(): void
@@ -111,8 +111,8 @@ final class FallbackPackabilityCheckerAdapterTest extends TestCase
         $products = [new Product(3.0, 1.0, 2.0, 5.0)];
         $box = new Box(1, 1.0, 2.0, 3.0, 10.0);
 
-        $result = $checker->canPackIntoBox($products, $box);
+        $result = $checker->findFirstPackableBox($products, [$box]);
 
-        self::assertTrue($result);
+        self::assertSame(1, $result?->getId());
     }
 }

@@ -37,9 +37,16 @@ final class PackProductsHandlerTest extends TestCase
 
         $catalog = new InMemoryBoxCatalog([$large, $small, $medium]);
         $cache = new InMemoryCache();
-        $checker = new CallbackChecker(static function (array $inputProducts, Box $box): bool {
-            return $box->getId() === 2;
-        });
+        $selector = static function (array $inputProducts, array $boxes): Box|null {
+            foreach ($boxes as $box) {
+                if ($box->getId() === 2) {
+                    return $box;
+                }
+            }
+
+            return null;
+        };
+        $checker = new CallbackChecker($selector);
 
         $handler = new PackProductsHandler($catalog, $checker, $cache, new NullLogger());
         $selected = $handler->handle($products);
@@ -56,7 +63,8 @@ final class PackProductsHandlerTest extends TestCase
         $catalog = new InMemoryBoxCatalog([$box]);
         $cache = new InMemoryCache();
         $cache->storage[$cache->buildKey($products)] = 9;
-        $checker = new CallbackChecker(static fn (): bool => true);
+        $selector = static fn (array $products, array $boxes): Box|null => $boxes[0] ?? null;
+        $checker = new CallbackChecker($selector);
 
         $handler = new PackProductsHandler($catalog, $checker, $cache, new NullLogger());
         $selected = $handler->handle($products);
@@ -70,7 +78,8 @@ final class PackProductsHandlerTest extends TestCase
         $products = [new Product(2.0, 2.0, 2.0, 1.0)];
         $catalog = new InMemoryBoxCatalog([new Box(1, 1.0, 1.0, 1.0, 10.0)]);
         $cache = new InMemoryCache();
-        $checker = new CallbackChecker(static fn (): bool => false);
+        $selector = static fn (array $products, array $boxes): Box|null => null;
+        $checker = new CallbackChecker($selector);
 
         $handler = new PackProductsHandler($catalog, $checker, $cache, new NullLogger());
         $selected = $handler->handle($products);
@@ -167,22 +176,22 @@ final class InMemoryCache implements PackingCachePort
 
 final class CallbackChecker implements PackabilityCheckerPort
 {
-    /** @var \Closure(list<Product>, Box): bool */
+    /** @var \Closure(array<int, Product>, array<int, Box>): (Box|null) */
     private \Closure $callback;
     public int $calls = 0;
 
     /**
-     * @param \Closure(list<Product>, Box): bool $callback
+    * @param \Closure(array<int, Product>, array<int, Box>): (Box|null) $callback
      */
     public function __construct(\Closure $callback)
     {
         $this->callback = $callback;
     }
 
-    public function canPackIntoBox(array $products, Box $box): bool
+    public function findFirstPackableBox(array $products, array $boxes): Box|null
     {
         $this->calls++;
 
-        return ($this->callback)($products, $box);
+        return ($this->callback)($products, $boxes);
     }
 }

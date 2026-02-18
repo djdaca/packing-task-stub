@@ -24,12 +24,13 @@ use Psr\Log\NullLogger;
 #[UsesClass(Product::class)]
 final class ThirdPartyPackabilityCheckerAdapterTest extends TestCase
 {
-    public function testReturnsTrueWhenAllItemsPackedInSingleBin(): void
+    public function testReturnsSelectedBoxWhenAllItemsPackedInSingleBin(): void
     {
         $responseBody = [
             'response' => [
                 'status' => 1,
                 'bins_packed' => [[
+                    'bin_data' => ['id' => 'box-7-1'],
                     'items' => [
                         ['id' => 'item-1'],
                         ['id' => 'item-2'],
@@ -41,17 +42,17 @@ final class ThirdPartyPackabilityCheckerAdapterTest extends TestCase
 
         [$adapter, $cache] = $this->createAdapter($responseBody);
 
-        $result = $adapter->canPackIntoBox(
+        $result = $adapter->findFirstPackableBox(
             [new Product(2.0, 2.0, 2.0, 1.0), new Product(1.0, 1.0, 1.0, 1.0)],
-            new Box(7, 5.0, 5.0, 5.0, 10.0),
+            [new Box(7, 5.0, 5.0, 5.0, 10.0)],
         );
 
-        self::assertTrue($result);
+        self::assertSame(7, $result?->getId());
         self::assertSame(1, $cache->storeCalls);
         self::assertSame(7, $cache->storedBoxId);
     }
 
-    public function testReturnsFalseWhenItemsAreDistributedToMultipleBins(): void
+    public function testReturnsNullWhenItemsAreDistributedToMultipleBins(): void
     {
         $responseBody = [
             'response' => [
@@ -66,16 +67,16 @@ final class ThirdPartyPackabilityCheckerAdapterTest extends TestCase
 
         [$adapter, $cache] = $this->createAdapter($responseBody);
 
-        $result = $adapter->canPackIntoBox(
+        $result = $adapter->findFirstPackableBox(
             [new Product(2.0, 2.0, 2.0, 1.0), new Product(1.0, 1.0, 1.0, 1.0)],
-            new Box(7, 5.0, 5.0, 5.0, 10.0),
+            [new Box(7, 5.0, 5.0, 5.0, 10.0)],
         );
 
-        self::assertFalse($result);
+        self::assertNull($result);
         self::assertSame(0, $cache->storeCalls);
     }
 
-    public function testReturnsFalseWhenNotPackedItemsExist(): void
+    public function testReturnsNullWhenNotPackedItemsExist(): void
     {
         $responseBody = [
             'response' => [
@@ -89,12 +90,12 @@ final class ThirdPartyPackabilityCheckerAdapterTest extends TestCase
 
         [$adapter, $cache] = $this->createAdapter($responseBody);
 
-        $result = $adapter->canPackIntoBox(
+        $result = $adapter->findFirstPackableBox(
             [new Product(2.0, 2.0, 2.0, 1.0), new Product(1.0, 1.0, 1.0, 1.0)],
-            new Box(7, 5.0, 5.0, 5.0, 10.0),
+            [new Box(7, 5.0, 5.0, 5.0, 10.0)],
         );
 
-        self::assertFalse($result);
+        self::assertNull($result);
         self::assertSame(0, $cache->storeCalls);
     }
 
@@ -105,7 +106,7 @@ final class ThirdPartyPackabilityCheckerAdapterTest extends TestCase
         [$adapter] = $this->createAdapter($responseBody, 503);
 
         $this->expectException(ThirdPartyPackingException::class);
-        $adapter->canPackIntoBox([new Product(2.0, 2.0, 2.0, 1.0)], new Box(7, 5.0, 5.0, 5.0, 10.0));
+        $adapter->findFirstPackableBox([new Product(2.0, 2.0, 2.0, 1.0)], [new Box(7, 5.0, 5.0, 5.0, 10.0)]);
     }
 
     /**

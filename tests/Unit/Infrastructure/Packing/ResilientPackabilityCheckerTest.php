@@ -27,29 +27,29 @@ final class ResilientPackabilityCheckerTest extends TestCase
         $primary = new class () implements PackabilityCheckerPort {
             public int $calls = 0;
 
-            public function canPackIntoBox(array $products, Box $box): bool
+            public function findFirstPackableBox(array $products, array $boxes): Box|null
             {
                 $this->calls++;
 
-                return true;
+                return $boxes[0] ?? null;
             }
         };
 
         $fallback = new class () implements PackabilityCheckerPort {
             public int $calls = 0;
 
-            public function canPackIntoBox(array $products, Box $box): bool
+            public function findFirstPackableBox(array $products, array $boxes): Box|null
             {
                 $this->calls++;
 
-                return false;
+                return null;
             }
         };
 
         $checker = new ResilientPackabilityChecker($primary, $fallback, new NullLogger());
-        $result = $checker->canPackIntoBox($products, $box);
+        $result = $checker->findFirstPackableBox($products, [$box]);
 
-        self::assertTrue($result);
+        self::assertSame(1, $result?->getId());
         self::assertSame(1, $primary->calls);
         self::assertSame(0, $fallback->calls);
     }
@@ -62,7 +62,7 @@ final class ResilientPackabilityCheckerTest extends TestCase
         $primary = new class () implements PackabilityCheckerPort {
             public int $calls = 0;
 
-            public function canPackIntoBox(array $products, Box $box): bool
+            public function findFirstPackableBox(array $products, array $boxes): Box|null
             {
                 $this->calls++;
 
@@ -73,18 +73,18 @@ final class ResilientPackabilityCheckerTest extends TestCase
         $fallback = new class () implements PackabilityCheckerPort {
             public int $calls = 0;
 
-            public function canPackIntoBox(array $products, Box $box): bool
+            public function findFirstPackableBox(array $products, array $boxes): Box|null
             {
                 $this->calls++;
 
-                return true;
+                return $boxes[0] ?? null;
             }
         };
 
         $checker = new ResilientPackabilityChecker($primary, $fallback, new NullLogger());
-        $result = $checker->canPackIntoBox($products, $box);
+        $result = $checker->findFirstPackableBox($products, [$box]);
 
-        self::assertTrue($result);
+        self::assertSame(1, $result?->getId());
         self::assertSame(1, $primary->calls);
         self::assertSame(1, $fallback->calls);
     }
@@ -95,22 +95,22 @@ final class ResilientPackabilityCheckerTest extends TestCase
         $box = new Box(1, 5.0, 5.0, 5.0, 10.0);
 
         $primary = new class () implements PackabilityCheckerPort {
-            public function canPackIntoBox(array $products, Box $box): bool
+            public function findFirstPackableBox(array $products, array $boxes): Box|null
             {
                 throw new ThirdPartyPackingException('Network error');
             }
         };
 
         $fallback = new class () implements PackabilityCheckerPort {
-            public function canPackIntoBox(array $products, Box $box): bool
+            public function findFirstPackableBox(array $products, array $boxes): Box|null
             {
-                return false;
+                return null;
             }
         };
 
         $checker = new ResilientPackabilityChecker($primary, $fallback, new NullLogger());
-        $result = $checker->canPackIntoBox($products, $box);
+        $result = $checker->findFirstPackableBox($products, [$box]);
 
-        self::assertFalse($result);
+        self::assertNull($result);
     }
 }

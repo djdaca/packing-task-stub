@@ -76,24 +76,24 @@ final class PackProductsHandler
 
             $this->logger->debug('[PackProductsHandler] Suitable boxes batch', ['count' => count($boxes)]);
 
-            foreach ($boxes as $box) {
-                $scannedCandidates++;
-                $this->logger->debug('[PackProductsHandler] Checking packability', ['boxId' => $box->getId()]);
-                $canPack = $this->packabilityChecker->canPackIntoBox($products, $box);
+            $selectedBox = $this->packabilityChecker->findFirstPackableBox($products, $boxes);
+            if ($selectedBox !== null) {
+                $selectedPosition = $this->findSelectedBoxPosition($boxes, $selectedBox);
+                $scannedCandidates += $selectedPosition;
+
                 $this->logger->debug('[PackProductsHandler] Packability check result', [
-                    'boxId' => $box->getId(),
-                    'canPack' => $canPack,
+                    'boxId' => $selectedBox->getId(),
+                    'canPack' => true,
+                ]);
+                $this->logger->info('[PackProductsHandler] Box selected', [
+                    'boxId' => $selectedBox->getId(),
+                    'scannedCandidates' => $scannedCandidates,
                 ]);
 
-                if ($canPack) {
-                    $this->logger->info('[PackProductsHandler] Box selected', [
-                        'boxId' => $box->getId(),
-                        'scannedCandidates' => $scannedCandidates,
-                    ]);
-
-                    return $box;
-                }
+                return $selectedBox;
             }
+
+            $scannedCandidates += count($boxes);
 
             $lastBox = $boxes[count($boxes) - 1];
             $lastVolume = $lastBox->volume();
@@ -107,6 +107,20 @@ final class PackProductsHandler
         $this->logger->warning('[PackProductsHandler] No suitable box found');
 
         return null;
+    }
+
+    /**
+     * @param list<Box> $boxes
+     */
+    private function findSelectedBoxPosition(array $boxes, Box $selectedBox): int
+    {
+        foreach ($boxes as $index => $box) {
+            if ($box->getId() !== null && $box->getId() === $selectedBox->getId()) {
+                return $index + 1;
+            }
+        }
+
+        return count($boxes);
     }
 
     /**

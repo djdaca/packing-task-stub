@@ -8,7 +8,7 @@ use App\Packing\Domain\Model\Box;
 
 interface BoxCatalogPort
 {
-    public const int DEFAULT_BATCH_SIZE = 100;
+    public const int DEFAULT_BATCH_SIZE = 50;
 
     /**
      * Returns a specific box by ID, or null if not found.

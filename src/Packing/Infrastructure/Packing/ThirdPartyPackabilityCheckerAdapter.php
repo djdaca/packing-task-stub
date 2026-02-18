@@ -9,6 +9,8 @@ use App\Packing\Application\Port\PackingCachePort;
 use App\Packing\Domain\Model\Box;
 use App\Packing\Domain\Model\Product;
 
+use function array_key_exists;
+use function array_slice;
 use function array_unique;
 use function array_values;
 use function count;
@@ -47,32 +49,93 @@ final class ThirdPartyPackabilityCheckerAdapter implements PackabilityCheckerPor
 
     /**
      * @param list<Product> $products
+     * @param list<Box> $boxes
      */
-    public function canPackIntoBox(array $products, Box $box): bool
+    public function findFirstPackableBox(array $products, array $boxes): Box|null
     {
+        if ($boxes === []) {
+            return null;
+        }
+
         $this->assertConfigured();
 
-        $payload = $this->buildPayload($products, $box);
+        $selectedBox = $this->findFirstPackableBoxInOrder($products, $boxes);
+        if ($selectedBox === null) {
+            return null;
+        }
+
+        $boxId = $selectedBox->getId();
+        if ($boxId === null) {
+            $this->logger->warning('[PackingAPI] Selected box has no ID; skipping cache write.');
+
+            return $selectedBox;
+        }
+
+        $this->cache->storeSelectedBox($products, $boxId);
+
+        return $selectedBox;
+    }
+
+    /**
+     * @param list<Product> $products
+     * @param list<Box> $boxes
+     */
+    private function findFirstPackableBoxInOrder(array $products, array $boxes, bool $segmentIsKnownPackable = false): Box|null
+    {
+        if ($boxes === []) {
+            return null;
+        }
+
+        if (!$segmentIsKnownPackable) {
+            $anyPackable = $this->findAnyPackableBox($products, $boxes);
+            if ($anyPackable === null) {
+                return null;
+            }
+        }
+
+        if (count($boxes) === 1) {
+            return $boxes[0];
+        }
+
+        $middle = intdiv(count($boxes), 2);
+        $leftBoxes = array_slice($boxes, 0, $middle);
+        $rightBoxes = array_slice($boxes, $middle);
+
+        $leftHasPackable = $this->findAnyPackableBox($products, $leftBoxes) !== null;
+        if ($leftHasPackable) {
+            return $this->findFirstPackableBoxInOrder($products, $leftBoxes, true);
+        }
+
+        return $this->findFirstPackableBoxInOrder($products, $rightBoxes, true);
+    }
+
+    /**
+     * @param list<Product> $products
+     * @param list<Box> $boxes
+     */
+    private function findAnyPackableBox(array $products, array $boxes): Box|null
+    {
+        [$payload, $boxByExternalId] = $this->buildPayload($products, $boxes);
         $response = $this->sendRequest($payload);
         $this->assertResponseStatus($response);
 
         $decoded = $this->decodeResponseBody($response);
         $typedDecoded = $this->normalizePayload($decoded);
-        $canPack = $this->extractPackable($typedDecoded, count($products));
-
-        // Cache only successful API responses (not fallback results)
-        if ($canPack) {
-            $boxId = $box->getId();
-            if ($boxId === null) {
-                $this->logger->warning('[PackingAPI] Selected box has no ID; skipping cache write.');
-
-                return $canPack;
-            }
-
-            $this->cache->storeSelectedBox($products, $boxId);
+        $selectedExternalBoxId = $this->extractSelectedPackedBinId($typedDecoded, count($products));
+        if ($selectedExternalBoxId === null) {
+            return null;
         }
 
-        return $canPack;
+        $selectedBox = $boxByExternalId[$selectedExternalBoxId] ?? null;
+        if ($selectedBox === null) {
+            $this->logger->error('[PackingAPI] Response returned unknown bin id.', [
+                'binId' => $selectedExternalBoxId,
+            ]);
+
+            return null;
+        }
+
+        return $selectedBox;
     }
 
     private function assertConfigured(): void
@@ -86,9 +149,10 @@ final class ThirdPartyPackabilityCheckerAdapter implements PackabilityCheckerPor
 
     /**
      * @param list<Product> $products
-     * @return array<string, mixed>
+     * @param list<Box> $boxes
+     * @return array{0: array<string, mixed>, 1: array<string, Box>}
      */
-    private function buildPayload(array $products, Box $box): array
+    private function buildPayload(array $products, array $boxes): array
     {
         $items = [];
         foreach ($products as $index => $product) {
@@ -102,22 +166,32 @@ final class ThirdPartyPackabilityCheckerAdapter implements PackabilityCheckerPor
             ];
         }
 
-        return [
-            'username' => $this->apiUsername,
-            'api_key' => $this->apiKey,
-            'bins' => [[
-                'id' => sprintf('box-%d', $box->getId() ?? 0),
+        $bins = [];
+        $boxByExternalId = [];
+        foreach ($boxes as $index => $box) {
+            $externalId = sprintf('box-%d-%d', $box->getId() ?? 0, $index + 1);
+            $bins[] = [
+                'id' => $externalId,
                 'w' => $box->getWidth(),
                 'h' => $box->getHeight(),
                 'd' => $box->getLength(),
                 'max_wg' => $box->getMaxWeight(),
-            ]],
+            ];
+            $boxByExternalId[$externalId] = $box;
+        }
+
+        $payload = [
+            'username' => $this->apiUsername,
+            'api_key' => $this->apiKey,
+            'bins' => $bins,
             'items' => $items,
             'params' => [
                 'optimization_mode' => 'bins_number',
                 'item_distribution' => false,
             ],
         ];
+
+        return [$payload, $boxByExternalId];
     }
 
     /**
@@ -199,43 +273,44 @@ final class ThirdPartyPackabilityCheckerAdapter implements PackabilityCheckerPor
     /**
      * @param array<string, mixed> $payload
      */
-    private function extractPackable(array $payload, int $requestedItemCount): bool
+    private function extractSelectedPackedBinId(array $payload, int $requestedItemCount): string|null
     {
         $responseNode = $this->extractResponseNode($payload);
         if ($responseNode === null) {
-            return false;
+            return null;
         }
 
         $this->assertApiAccessAvailable($responseNode);
 
         $status = $responseNode['status'] ?? null;
         $binsPacked = $this->extractBinsPacked($responseNode);
-        if ($binsPacked === null) {
-            return false;
+
+        if ($binsPacked === []) {
+            return null;
         }
 
         if (!$this->hasSinglePackedBin($binsPacked)) {
-            return false;
+            return null;
         }
 
         if (!$this->hasNoNotPackedItems($responseNode)) {
-            return false;
+            return null;
         }
 
         if ($status !== 1) {
             $this->logger->warning('[PackingAPI] Response status indicates failure.', ['status' => $status]);
 
-            return false;
+            return null;
         }
 
         $items = $this->extractPackedItemsFromFirstBin($binsPacked);
         if ($items === null) {
-            return false;
+            return null;
         }
 
         $packedCount = $this->countUniquePackedItemIds($items);
         if ($packedCount === null) {
-            return false;
+            return null;
         }
 
         $canPack = $packedCount === $requestedItemCount;
@@ -246,7 +321,38 @@ final class ThirdPartyPackabilityCheckerAdapter implements PackabilityCheckerPor
             'canPack' => $canPack,
         ]);
 
-        return $canPack;
+        if (!$canPack) {
+            return null;
+        }
+
+        return $this->extractSelectedBinId($binsPacked);
+    }
+
+    /**
+     * @param list<mixed> $binsPacked
+     */
+    private function extractSelectedBinId(array $binsPacked): string|null
+    {
+        $firstBin = $binsPacked[0];
+        if (!is_array($firstBin)) {
+            return null;
+        }
+
+        $binData = $firstBin['bin_data'] ?? null;
+        if (!is_array($binData)) {
+            $this->logger->error('[PackingAPI] Packed bin does not contain "bin_data".');
+
+            return null;
+        }
+
+        $binId = $binData['id'] ?? null;
+        if (!is_string($binId) || $binId === '') {
+            $this->logger->error('[PackingAPI] Packed bin does not contain valid "bin_data.id".');
+
+            return null;
+        }
+
+        return $binId;
     }
 
     /**
@@ -311,15 +417,21 @@ final class ThirdPartyPackabilityCheckerAdapter implements PackabilityCheckerPor
 
     /**
      * @param array<string, mixed> $responseNode
-     * @return list<mixed>|null
+     * @return list<mixed>
      */
-    private function extractBinsPacked(array $responseNode): array|null
+    private function extractBinsPacked(array $responseNode): array
     {
-        $binsPacked = $responseNode['bins_packed'] ?? null;
-        if (!is_array($binsPacked) || !isset($binsPacked[0])) {
-            $this->logger->error('[PackingAPI] Response does not contain "bins_packed" array.');
+        if (!array_key_exists('bins_packed', $responseNode)) {
+            $this->logger->error('[PackingAPI] Response does not contain "bins_packed" key.');
 
-            return null;
+            throw new ThirdPartyPackingException('Third-party packing API returned invalid response shape. Falling back to local calculation.');
+        }
+
+        $binsPacked = $responseNode['bins_packed'];
+        if (!is_array($binsPacked)) {
+            $this->logger->error('[PackingAPI] Response contains invalid "bins_packed" value type.');
+
+            throw new ThirdPartyPackingException('Third-party packing API returned invalid response shape. Falling back to local calculation.');
         }
 
         return array_values($binsPacked);

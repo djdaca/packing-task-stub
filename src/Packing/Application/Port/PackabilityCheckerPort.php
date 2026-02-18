@@ -11,6 +11,7 @@ interface PackabilityCheckerPort
 {
     /**
      * @param list<Product> $products
+     * @param list<Box> $boxes
      */
-    public function canPackIntoBox(array $products, Box $box): bool;
+    public function findFirstPackableBox(array $products, array $boxes): Box|null;
 }

@@ -17,8 +17,23 @@ final class FallbackPackabilityCheckerAdapter implements PackabilityCheckerPort
 
     /**
      * @param list<Product> $products
+     * @param list<Box> $boxes
      */
-    public function canPackIntoBox(array $products, Box $box): bool
+    public function findFirstPackableBox(array $products, array $boxes): Box|null
+    {
+        foreach ($boxes as $box) {
+            if ($this->canPackIntoBox($products, $box)) {
+                return $box;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param list<Product> $products
+     */
+    private function canPackIntoBox(array $products, Box $box): bool
     {
         $boxDims = $box->sortedDimensions();
 
