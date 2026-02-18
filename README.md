@@ -8,7 +8,7 @@ Microservice for calculating the most suitable box for packing products based on
 ✅ **Resilient Fallback** - Local fallback algorithm when third-party API fails  
 ✅ **Result Caching** - Efficient database cache storing only final selected box (not per-box data)  
 ✅ **Comprehensive Logging** - Detailed logs for debugging and monitoring  
-✅ **Full Test Coverage** - 61 tests covering all critical components (unit + integration)  
+✅ **Full Test Coverage** - 87 tests (156 assertions) covering critical components (unit + integration)  
 ✅ **DDD Architecture** - Clean separation with Ports & Adapters pattern  
 ✅ **Test Isolation** - Separate `test_packing` database for clean test environment  
 ✅ **Docker Ready** - Full Docker Compose setup with MariaDB and PHP  
@@ -122,14 +122,15 @@ DDD + ports-and-adapters architecture in `src/Packing`:
 
 ### Tests
 
-**61 tests** covering all critical components:
+**87 tests** (**156 assertions**) covering critical components:
 
 - **Unit Tests** (`tests/Unit`):
   - `PackProductsHandler` - Main use-case logic with cache integration
-  - `FallbackPackabilityCheckerAdapter` - Local packing algorithm (8 tests)
-  - `ResilientPackabilityChecker` - Resilience/fallback mechanism (3 tests)
-  - `ProductRequestMapper` - Input validation (14 tests)
-  - `Box` and `Product` models - Domain logic (22 tests)
+  - `ThirdPartyPackabilityCheckerAdapter` - Third-party API behavior and failure paths
+  - `FallbackPackabilityCheckerAdapter` - Local packing algorithm
+  - `ResilientPackabilityChecker` - Resilience/fallback mechanism
+  - `ProductRequestMapper` - Input validation
+  - `Box` and `Product` models - Domain logic
 
 - **Integration Tests** (`tests/Integration`):
   - Full application flow with real database
