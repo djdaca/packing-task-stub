@@ -141,8 +141,8 @@ DDD + ports-and-adapters architecture in `src/Packing`:
 ```bash
 make test                           # All tests
 make test-coverage                  # With coverage report
-./vendor/bin/phpunit --testsuite Unit       # Unit only
-./vendor/bin/phpunit tests/Integration/     # Integration only
+docker-compose -f docker/docker-compose.yml exec app ./vendor/bin/phpunit --testsuite Unit   # Unit only (inside container)
+docker-compose -f docker/docker-compose.yml exec app ./vendor/bin/phpunit tests/Integration/  # Integration only (inside container)
 ```
 
 ### Caching
@@ -197,11 +197,11 @@ Table: packing_calculation_cache
 **Structure:**
 ```
 production: packing
-├─ packaging (5 boxes)
+├─ packaging (12 boxes)
 └─ packing_calculation_cache (cached results)
 
 testing: test_packing
-├─ packaging (5 boxes, cloned from packing)
+├─ packaging (12 boxes, cloned from packing)
 └─ packing_calculation_cache (empty, test-isolated)
 ```
 
@@ -213,6 +213,13 @@ testing: test_packing
 | 3  | 2.0   | 2.0    | 10.0   | 20      |
 | 4  | 5.5   | 6.0    | 7.5    | 30      |
 | 5  | 9.0   | 9.0    | 9.0    | 30      |
+| 6  | 1.0   | 1.0    | 1.0    | 5       |
+| 7  | 2.0   | 3.0    | 4.0    | 10      |
+| 8  | 3.0   | 5.0    | 8.0    | 15      |
+| 9  | 6.0   | 6.0    | 12.0   | 25      |
+| 10 | 10.0  | 12.0   | 14.0   | 40      |
+| 11 | 12.5  | 15.0   | 18.0   | 60      |
+| 12 | 20.0  | 20.0   | 20.0   | 80      |
 
 **Initialization:**
 - Single source: `data/packaging-schema.sql`
