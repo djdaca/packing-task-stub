@@ -8,7 +8,7 @@ use App\Packing\Application\UseCase\PackProductsHandler;
 use App\Packing\Infrastructure\Packing\FallbackPackabilityCheckerAdapter;
 use App\Packing\Infrastructure\Packing\ForcedFallbackPackabilityChecker;
 use App\Packing\Infrastructure\Packing\ResilientPackabilityChecker;
-use App\Packing\Infrastructure\Packing\ThirdPartyPackabilityCheckerAdapter;
+use App\Packing\Infrastructure\Packing\ThreeDBinPackingCheckerAdapter;
 use App\Packing\Infrastructure\Persistence\DoctrineBoxCatalogAdapter;
 use App\Packing\Infrastructure\Persistence\DoctrinePackingCacheAdapter;
 use App\Packing\Interface\Http\InputValidationException;
@@ -246,7 +246,7 @@ class Application
             $this->logger,
         );
 
-        $thirdPartyChecker = new ThirdPartyPackabilityCheckerAdapter(
+        $thirdPartyChecker = new ThreeDBinPackingCheckerAdapter(
             $this->buildHttpClient(),
             $this->buildRequestFactory(),
             $this->buildStreamFactory(),

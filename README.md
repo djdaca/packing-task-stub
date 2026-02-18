@@ -8,7 +8,7 @@ Microservice for calculating the most suitable box for packing products based on
 ✅ **Resilient Fallback** - Local fallback algorithm when third-party API fails  
 ✅ **Result Caching** - Efficient database cache storing only final selected box (not per-box data)  
 ✅ **Comprehensive Logging** - Detailed logs for debugging and monitoring  
-✅ **Full Test Coverage** - 87 tests (156 assertions) covering critical components (unit + integration)  
+✅ **Full Test Coverage** - 89 tests (166 assertions) covering critical components (unit + integration)  
 ✅ **DDD Architecture** - Clean separation with Ports & Adapters pattern  
 ✅ **Test Isolation** - Separate `test_packing` database for clean test environment  
 ✅ **Docker Ready** - Full Docker Compose setup with MariaDB and PHP  
@@ -112,7 +112,7 @@ DDD + ports-and-adapters architecture in `src/Packing`:
 - **Infrastructure** - Adapters (implementations)
   - `DoctrineBoxCatalogAdapter` - box catalog from database
   - `DoctrinePackingCacheAdapter` - caching with database
-  - `ThirdPartyPackabilityCheckerAdapter` - 3dbinpacking.com API integration
+  - `ThreeDBinPackingCheckerAdapter` - 3dbinpacking.com API integration
   - `FallbackPackabilityCheckerAdapter` - local volume-based algorithm
   - `ResilientPackabilityChecker` - resilience wrapper (primary + fallback)
 
@@ -122,11 +122,11 @@ DDD + ports-and-adapters architecture in `src/Packing`:
 
 ### Tests
 
-**87 tests** (**156 assertions**) covering critical components:
+**89 tests** (**166 assertions**) covering critical components:
 
 - **Unit Tests** (`tests/Unit`):
   - `PackProductsHandler` - Main use-case logic with cache integration
-  - `ThirdPartyPackabilityCheckerAdapter` - Third-party API behavior and failure paths
+  - `ThreeDBinPackingCheckerAdapter` - Third-party API behavior and failure paths
   - `FallbackPackabilityCheckerAdapter` - Local packing algorithm
   - `ResilientPackabilityChecker` - Resilience/fallback mechanism
   - `ProductRequestMapper` - Input validation
@@ -184,7 +184,7 @@ Table: packing_calculation_cache
 **Configuration** (see `.env.example`):
 - `PACKING_API_USERNAME` - 3dbinpacking.com account email
 - `PACKING_API_KEY` - 3dbinpacking.com API key
-- `PACKING_API_URL` - API endpoint
+- `PACKING_API_URL` - Base API URL (adapter appends `/packer/findBinSize`)
 - `PACKING_API_TIMEOUT_SECONDS` - Request timeout (default: 4 seconds)
 
 **Resilience:**
