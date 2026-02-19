@@ -160,7 +160,9 @@ final class ThreeDBinPackingCheckerAdapter implements PackabilityCheckerPort
         $endpointUrl = $this->buildEndpointUrl();
 
         $this->logger->info('[PackingAPI] Sending request to external API', ['url' => $endpointUrl]);
-        $this->logger->debug('[PackingAPI] Payload', ['payload' => $payload]);
+        $sanitizedPayload = $payload;
+        unset($sanitizedPayload['api_key']);
+        $this->logger->debug('[PackingAPI] Payload', ['payload' => $sanitizedPayload]);
 
         try {
             $body = json_encode($payload, JSON_THROW_ON_ERROR);

@@ -64,6 +64,8 @@ class Application
         $this->streamFactory = $streamFactory;
         $this->app = AppFactory::create(new ResponseFactory(), null);
 
+        $this->app->get('/healthcheck', fn (ServerRequestInterface $request, ResponseInterface $response): ResponseInterface => $this->json($response, ['status' => 'ok'], 200));
+
         $this->app->get('/openapi.json', function (ServerRequestInterface $request, ResponseInterface $response): ResponseInterface {
             $openapi = (new Generator())->generate([__DIR__]);
             if ($openapi === null) {

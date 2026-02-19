@@ -42,7 +42,7 @@ services:
       - ../vendor:/app/vendor
       - composer-cache:/tmp/composer-cache
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/docs/index.html"]
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/healthcheck"]
       interval: 5s
       timeout: 5s
       retries: 10
