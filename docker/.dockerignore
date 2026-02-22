@@ -1,0 +1,14 @@
+.git
+.gitignore
+.env
+.env.example
+.editorconfig
+README.md
+SOLUTION_DEFENSE.md
+SUMMARY.md
+log.txt
+*.log
+.vscode
+.phpunit.cache
+Makefile
+*.md

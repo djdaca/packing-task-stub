@@ -20,7 +20,6 @@ services:
   app:
     build: .
     working_dir: /app
-    command: ["php", "-S", "0.0.0.0:8080", "-t", "public"]
     user: ${UID:-1000}:${GID:-1000}
     depends_on:
       mysql:
@@ -42,7 +41,7 @@ services:
       - ../vendor:/app/vendor
       - composer-cache:/tmp/composer-cache
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/healthcheck"]
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8080/healthcheck"]
       interval: 5s
       timeout: 5s
       retries: 10

@@ -118,6 +118,4 @@ final class DoctrinePackingCacheAdapter implements PackingCachePort
             'products' => $normalizedProducts,
         ], JSON_THROW_ON_ERROR));
     }
-
-    // Cache entries are not expired automatically; cleanup is manual if ever needed.
 }
