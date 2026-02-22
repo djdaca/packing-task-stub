@@ -93,9 +93,10 @@ final class PackProductsHandler
                 return $selectedBox;
             }
 
-            $scannedCandidates += count($boxes);
+            $batchSize = count($boxes);
+            $scannedCandidates += $batchSize;
 
-            $lastBox = $boxes[count($boxes) - 1];
+            $lastBox = $boxes[$batchSize - 1];
             $lastVolume = $lastBox->volume();
             $lastId = $lastBox->getId();
 
@@ -120,6 +121,7 @@ final class PackProductsHandler
             }
         }
 
+        // fallback, should not happen if the selected box is from the batch
         return count($boxes);
     }
 

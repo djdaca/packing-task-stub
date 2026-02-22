@@ -382,7 +382,7 @@ final class ThreeDBinPackingCheckerAdapterTest extends TestCase
         self::assertSame(['application/json'], $capturingClient->requests[0]->getHeader('Content-Type'));
     }
 
-    public function testReusesInMemoryProbeResultForIdenticalRequest(): void
+    public function testSendsRequestAgainForIdenticalCallWithoutProbeMemoization(): void
     {
         $responseBody = [
             'response' => [
@@ -413,7 +413,7 @@ final class ThreeDBinPackingCheckerAdapterTest extends TestCase
 
         self::assertSame(7, $firstResult?->getId());
         self::assertSame(7, $secondResult?->getId());
-        self::assertCount(1, $capturingClient->requests);
+        self::assertCount(2, $capturingClient->requests);
         self::assertSame(2, $cache->storeCalls);
     }
 

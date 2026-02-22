@@ -11,11 +11,7 @@ use App\Packing\Domain\Model\Product;
 use App\Packing\Infrastructure\Packing\Api\findBinSize\PackingApiRequest;
 use App\Packing\Infrastructure\Packing\Api\findBinSize\PackingApiResponse;
 
-use function array_key_exists;
-use function array_key_first;
-use function array_slice;
 use function count;
-use function hash;
 use function in_array;
 use function json_encode;
 
@@ -28,18 +24,11 @@ use Psr\Log\LoggerInterface;
 
 use function rtrim;
 use function sprintf;
-use function str_ends_with;
 
 final class ThreeDBinPackingCheckerAdapter implements PackabilityCheckerPort
 {
     private const string FIND_BIN_SIZE_PATH = '/packer/findBinSize';
     private const array RETRIABLE_STATUS_CODES = [408, 429, 503, 504]; // Timeout, RateLimit, ServiceUnavailable, GatewayTimeout
-    private const int MAX_IN_MEMORY_PROBE_CACHE_ENTRIES = 256;
-
-    /**
-     * @var array<string, string|null>
-     */
-    private array $packabilityProbeCache = [];
 
     public function __construct(
         private ClientInterface $httpClient,
@@ -65,7 +54,11 @@ final class ThreeDBinPackingCheckerAdapter implements PackabilityCheckerPort
 
         $this->assertConfigured();
 
-        $selectedBox = $this->findFirstPackableBoxInOrder($products, $boxes);
+        $selectedBox = $this->findSelectedPackableBoxFromApi($products, $boxes);
+        if ($selectedBox !== null) {
+            $this->logger->info('[PackingAPI] API-first selection succeeded.', ['boxId' => $selectedBox->getId()]);
+        }
+
         if ($selectedBox === null) {
             return null;
         }
@@ -86,59 +79,15 @@ final class ThreeDBinPackingCheckerAdapter implements PackabilityCheckerPort
      * @param list<Product> $products
      * @param list<Box> $boxes
      */
-    private function findFirstPackableBoxInOrder(array $products, array $boxes, bool $segmentIsKnownPackable = false): Box|null
-    {
-        if ($boxes === []) {
-            return null;
-        }
-
-        if (!$segmentIsKnownPackable) {
-            $anyPackable = $this->findAnyPackableBox($products, $boxes);
-            if ($anyPackable === null) {
-                return null;
-            }
-        }
-
-        if (count($boxes) === 1) {
-            return $boxes[0];
-        }
-
-        $middle = intdiv(count($boxes), 2);
-        $leftBoxes = array_slice($boxes, 0, $middle);
-        $rightBoxes = array_slice($boxes, $middle);
-
-        $leftHasPackable = $this->findAnyPackableBox($products, $leftBoxes) !== null;
-        if ($leftHasPackable) {
-            return $this->findFirstPackableBoxInOrder($products, $leftBoxes, true);
-        }
-
-        return $this->findFirstPackableBoxInOrder($products, $rightBoxes, true);
-    }
-
-    /**
-     * @param list<Product> $products
-     * @param list<Box> $boxes
-     */
-    private function findAnyPackableBox(array $products, array $boxes): Box|null
+    private function findSelectedPackableBoxFromApi(array $products, array $boxes): Box|null
     {
         $request = $this->buildRequest($products, $boxes);
         $boxByExternalId = $request->boxByExternalId();
-        $requestPayload = $request->toArray();
-        $probeCacheKey = $this->buildProbeCacheKey($requestPayload);
+        $response = $this->sendRequest($request);
+        $this->assertResponseStatus($response);
 
-        if (array_key_exists($probeCacheKey, $this->packabilityProbeCache)) {
-            $this->logger->debug('[PackingAPI] Probe cache hit', ['key' => $probeCacheKey]);
-            $selectedExternalBoxId = $this->packabilityProbeCache[$probeCacheKey];
-        } else {
-            $this->logger->debug('[PackingAPI] Probe cache miss', ['key' => $probeCacheKey]);
-            $response = $this->sendRequest($request);
-            $this->assertResponseStatus($response);
-
-            $parsedResponse = PackingApiResponse::fromHttpResponse($response);
-            $selectedExternalBoxId = $this->extractSelectedPackedBinId($parsedResponse, count($products));
-
-            $this->rememberProbeResult($probeCacheKey, $selectedExternalBoxId);
-        }
+        $parsedResponse = PackingApiResponse::fromHttpResponse($response);
+        $selectedExternalBoxId = $this->extractSelectedPackedBinId($parsedResponse, count($products));
 
         if ($selectedExternalBoxId === null) {
             return null;
@@ -154,29 +103,6 @@ final class ThreeDBinPackingCheckerAdapter implements PackabilityCheckerPort
         }
 
         return $selectedBox;
-    }
-
-    /**
-     * @param array<string, mixed> $payload
-     */
-    private function buildProbeCacheKey(array $payload): string
-    {
-        $sanitizedPayload = $payload;
-        unset($sanitizedPayload['username'], $sanitizedPayload['api_key']);
-
-        return hash('sha256', json_encode($sanitizedPayload, JSON_THROW_ON_ERROR));
-    }
-
-    private function rememberProbeResult(string $probeCacheKey, string|null $selectedExternalBoxId): void
-    {
-        if (!array_key_exists($probeCacheKey, $this->packabilityProbeCache)
-            && count($this->packabilityProbeCache) >= self::MAX_IN_MEMORY_PROBE_CACHE_ENTRIES
-        ) {
-            $oldestKey = array_key_first($this->packabilityProbeCache);
-            unset($this->packabilityProbeCache[$oldestKey]);
-        }
-
-        $this->packabilityProbeCache[$probeCacheKey] = $selectedExternalBoxId;
     }
 
     private function assertConfigured(): void
@@ -231,12 +157,7 @@ final class ThreeDBinPackingCheckerAdapter implements PackabilityCheckerPort
 
     private function buildEndpointUrl(): string
     {
-        $baseUrl = rtrim($this->apiUrl, '/');
-        if (str_ends_with($baseUrl, self::FIND_BIN_SIZE_PATH)) {
-            return $baseUrl;
-        }
-
-        return $baseUrl . self::FIND_BIN_SIZE_PATH;
+        return rtrim($this->apiUrl, '/') . self::FIND_BIN_SIZE_PATH;
     }
 
     private function assertResponseStatus(ResponseInterface $response): void
