@@ -382,6 +382,41 @@ final class ThreeDBinPackingCheckerAdapterTest extends TestCase
         self::assertSame(['application/json'], $capturingClient->requests[0]->getHeader('Content-Type'));
     }
 
+    public function testReusesInMemoryProbeResultForIdenticalRequest(): void
+    {
+        $responseBody = [
+            'response' => [
+                'status' => 1,
+                'errors' => [],
+                'bins_packed' => [[
+                    'bin_data' => ['id' => 'box-7-1'],
+                    'items' => [['id' => 'item-1']],
+                ]],
+                'not_packed_items' => [],
+            ],
+        ];
+
+        $response = new Response(
+            200,
+            ['Content-Type' => 'application/json'],
+            json_encode($responseBody, JSON_THROW_ON_ERROR),
+        );
+
+        $capturingClient = new CapturingHttpClient($response);
+        [$adapter, $cache] = $this->createAdapterWithClient($capturingClient);
+
+        $products = [new Product(2.0, 3.0, 4.0, 1.5)];
+        $boxes = [new Box(7, 5.0, 6.0, 7.0, 10.0)];
+
+        $firstResult = $adapter->findFirstPackableBox($products, $boxes);
+        $secondResult = $adapter->findFirstPackableBox($products, $boxes);
+
+        self::assertSame(7, $firstResult?->getId());
+        self::assertSame(7, $secondResult?->getId());
+        self::assertCount(1, $capturingClient->requests);
+        self::assertSame(2, $cache->storeCalls);
+    }
+
     /**
      * @param array<string, mixed> $responseBody
     * @return array{0: ThreeDBinPackingCheckerAdapter, 1: InMemoryPackingCache}
